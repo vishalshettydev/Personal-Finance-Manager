@@ -13,6 +13,16 @@ export default function Dashboard() {
     }
   }, [user, loading, initialize]);
 
+  // Helper function to format Indian Rupee
+  const formatINR = (amount: number) => {
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">

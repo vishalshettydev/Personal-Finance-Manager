@@ -21,6 +21,7 @@ import {
   Home,
   Car,
   Briefcase,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -52,6 +53,13 @@ interface TreeNode {
   children?: TreeNode[];
 }
 
+// Account Types from database schema
+interface AccountType {
+  id: string;
+  name: string;
+  category: "DEBIT" | "CREDIT";
+}
+
 export default function Dashboard() {
   const { user, loading, initialize } = useAuthStore();
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
@@ -73,14 +81,30 @@ export default function Dashboard() {
     date: new Date().toISOString().split("T")[0],
   });
 
-  // Account form state
+  // Account form state - Updated to match database schema
   const [accountForm, setAccountForm] = useState({
     name: "",
-    type: "",
-    balance: "",
-    bank: "",
+    code: "",
+    account_type_id: "",
+    parent_id: "none",
     description: "",
+    initial_balance: "0",
   });
+
+  // Mock account types (these would come from the database)
+  const accountTypes: AccountType[] = [
+    { id: "1", name: "Bank Account", category: "DEBIT" },
+    { id: "2", name: "Cash", category: "DEBIT" },
+    { id: "3", name: "Credit Card", category: "CREDIT" },
+    { id: "4", name: "Investment Account", category: "DEBIT" },
+    { id: "5", name: "Fixed Deposit", category: "DEBIT" },
+    { id: "6", name: "Mutual Fund", category: "DEBIT" },
+    { id: "7", name: "Stock Portfolio", category: "DEBIT" },
+    { id: "8", name: "Real Estate", category: "DEBIT" },
+    { id: "9", name: "Vehicle", category: "DEBIT" },
+    { id: "10", name: "Loan", category: "CREDIT" },
+    { id: "11", name: "Digital Wallet", category: "DEBIT" },
+  ];
 
   useEffect(() => {
     if (!user && loading) {
@@ -203,6 +227,31 @@ export default function Dashboard() {
     );
   };
 
+  // Get flat list of accounts for parent selection
+  const getFlatAccountsList = (
+    nodes: TreeNode[],
+    prefix = ""
+  ): Array<{ id: string; name: string; level: number }> => {
+    const result: Array<{ id: string; name: string; level: number }> = [];
+
+    nodes.forEach((node) => {
+      const currentName = prefix ? `${prefix} > ${node.name}` : node.name;
+      const level = prefix.split(" > ").length - 1;
+
+      result.push({
+        id: node.id,
+        name: currentName,
+        level,
+      });
+
+      if (node.children) {
+        result.push(...getFlatAccountsList(node.children, currentName));
+      }
+    });
+
+    return result;
+  };
+
   const handleTransactionSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     console.log("Transaction submitted:", transactionForm);
@@ -220,17 +269,20 @@ export default function Dashboard() {
   const handleAccountSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     console.log("Account submitted:", accountForm);
+    // TODO: Add API call to create account in database
+    // This would insert into the 'accounts' table with proper parent_id and account_type_id
     setIsAccountModalOpen(false);
     setAccountForm({
       name: "",
-      type: "",
-      balance: "",
-      bank: "",
+      code: "",
+      account_type_id: "",
+      parent_id: "none",
       description: "",
+      initial_balance: "0",
     });
   };
 
-  // Enhanced nested accounts data structure
+  // Enhanced nested accounts data structure (this would come from database)
   const accountsTreeData: TreeNode[] = [
     {
       id: "banking",
@@ -538,6 +590,8 @@ export default function Dashboard() {
     },
   ];
 
+  const flatAccountsList = getFlatAccountsList(accountsTreeData);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -590,10 +644,21 @@ export default function Dashboard() {
                 <DialogHeader>
                   <DialogTitle>Add New Transaction</DialogTitle>
                   <DialogDescription>
-                    Record a new income or expense transaction.
+                    Record a new income or expense transaction using
+                    double-entry accounting.
                   </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleTransactionSubmit} className="space-y-4">
+                  <div className="bg-blue-50 p-3 rounded-lg">
+                    <div className="flex items-center">
+                      <AlertCircle className="h-4 w-4 text-blue-600 mr-2" />
+                      <p className="text-sm text-blue-700">
+                        This uses double-entry accounting. Each transaction
+                        affects at least two accounts.
+                      </p>
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="type">Type</Label>
@@ -709,7 +774,7 @@ export default function Dashboard() {
                     <Label htmlFor="description">Description</Label>
                     <Textarea
                       id="description"
-                      placeholder="Optional description..."
+                      placeholder="Transaction description..."
                       value={transactionForm.description}
                       onChange={(e) =>
                         setTransactionForm({
@@ -717,6 +782,7 @@ export default function Dashboard() {
                           description: e.target.value,
                         })
                       }
+                      required
                     />
                   </div>
 
@@ -747,90 +813,135 @@ export default function Dashboard() {
                   <span>Add Account</span>
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
+              <DialogContent className="sm:max-w-[500px]">
                 <DialogHeader>
                   <DialogTitle>Add New Account</DialogTitle>
                   <DialogDescription>
-                    Add a new bank account, credit card, or cash account.
+                    Create a new account in your chart of accounts. This follows
+                    double-entry accounting principles.
                   </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleAccountSubmit} className="space-y-4">
-                  <div>
-                    <Label htmlFor="accountName">Account Name</Label>
-                    <Input
-                      id="accountName"
-                      placeholder="e.g., HDFC Savings"
-                      value={accountForm.name}
-                      onChange={(e) =>
-                        setAccountForm({ ...accountForm, name: e.target.value })
-                      }
-                      required
-                    />
+                  <div className="bg-amber-50 p-3 rounded-lg">
+                    <div className="flex items-center">
+                      <AlertCircle className="h-4 w-4 text-amber-600 mr-2" />
+                      <p className="text-sm text-amber-700">
+                        Set up your chart of accounts before recording
+                        transactions. You can create nested account hierarchies.
+                      </p>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="accountType">Account Type</Label>
-                      <Select
-                        value={accountForm.type}
-                        onValueChange={(value) =>
-                          setAccountForm({ ...accountForm, type: value })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="savings">
-                            Savings Account
-                          </SelectItem>
-                          <SelectItem value="current">
-                            Current Account
-                          </SelectItem>
-                          <SelectItem value="credit">Credit Card</SelectItem>
-                          <SelectItem value="investment">
-                            Investment Account
-                          </SelectItem>
-                          <SelectItem value="cash">Cash</SelectItem>
-                          <SelectItem value="loan">Loan Account</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="balance">Initial Balance (₹)</Label>
+                      <Label htmlFor="accountName">Account Name *</Label>
                       <Input
-                        id="balance"
-                        type="number"
-                        placeholder="0"
-                        value={accountForm.balance}
+                        id="accountName"
+                        placeholder="e.g., HDFC Primary Savings"
+                        value={accountForm.name}
                         onChange={(e) =>
                           setAccountForm({
                             ...accountForm,
-                            balance: e.target.value,
+                            name: e.target.value,
                           })
                         }
                         required
                       />
                     </div>
+                    <div>
+                      <Label htmlFor="accountCode">Account Code</Label>
+                      <Input
+                        id="accountCode"
+                        placeholder="e.g., 1001"
+                        value={accountForm.code}
+                        onChange={(e) =>
+                          setAccountForm({
+                            ...accountForm,
+                            code: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
                   </div>
 
                   <div>
-                    <Label htmlFor="bank">Bank/Institution</Label>
+                    <Label htmlFor="accountType">Account Type *</Label>
+                    <Select
+                      value={accountForm.account_type_id}
+                      onValueChange={(value) =>
+                        setAccountForm({
+                          ...accountForm,
+                          account_type_id: value,
+                        })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select account type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {accountTypes.map((type) => (
+                          <SelectItem key={type.id} value={type.id}>
+                            {type.name} ({type.category})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="parentAccount">
+                      Parent Account (Optional)
+                    </Label>
+                    <Select
+                      value={accountForm.parent_id}
+                      onValueChange={(value) =>
+                        setAccountForm({
+                          ...accountForm,
+                          parent_id: value === "none" ? "" : value,
+                        })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select parent account for hierarchy" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">
+                          No Parent (Top Level)
+                        </SelectItem>
+                        {flatAccountsList.map((account) => (
+                          <SelectItem key={account.id} value={account.id}>
+                            {"  ".repeat(account.level)}└ {account.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="initialBalance">Initial Balance (₹)</Label>
                     <Input
-                      id="bank"
-                      placeholder="e.g., HDFC Bank, ICICI Bank"
-                      value={accountForm.bank}
+                      id="initialBalance"
+                      type="number"
+                      placeholder="0"
+                      value={accountForm.initial_balance}
                       onChange={(e) =>
-                        setAccountForm({ ...accountForm, bank: e.target.value })
+                        setAccountForm({
+                          ...accountForm,
+                          initial_balance: e.target.value,
+                        })
                       }
                     />
+                    <p className="text-xs text-gray-500 mt-1">
+                      For DEBIT accounts: positive = asset/expense. For CREDIT
+                      accounts: positive = liability/income.
+                    </p>
                   </div>
 
                   <div>
                     <Label htmlFor="accountDescription">Description</Label>
                     <Textarea
                       id="accountDescription"
-                      placeholder="Optional description..."
+                      placeholder="Account description and purpose..."
                       value={accountForm.description}
                       onChange={(e) =>
                         setAccountForm({
@@ -849,7 +960,7 @@ export default function Dashboard() {
                     >
                       Cancel
                     </Button>
-                    <Button type="submit">Add Account</Button>
+                    <Button type="submit">Create Account</Button>
                   </div>
                 </form>
               </DialogContent>
@@ -983,12 +1094,35 @@ export default function Dashboard() {
           <div className="lg:col-span-4">
             <div className="bg-white rounded-lg shadow max-h-[600px] overflow-y-auto">
               <div className="p-6 border-b border-gray-200 sticky top-0 bg-white">
-                <h2 className="text-xl font-bold text-gray-900">Accounts</h2>
+                <div className="flex justify-between items-center">
+                  <h2 className="text-xl font-bold text-gray-900">
+                    Chart of Accounts
+                  </h2>
+                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                    Double Entry
+                  </span>
+                </div>
               </div>
               <div className="p-4">
-                {accountsTreeData.map((node) => (
-                  <TreeNodeComponent key={node.id} node={node} level={0} />
-                ))}
+                {accountsTreeData.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Landmark className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                    <p className="text-gray-500 mb-4">
+                      No accounts created yet
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsAccountModalOpen(true)}
+                    >
+                      Create Your First Account
+                    </Button>
+                  </div>
+                ) : (
+                  accountsTreeData.map((node) => (
+                    <TreeNodeComponent key={node.id} node={node} level={0} />
+                  ))
+                )}
               </div>
             </div>
           </div>

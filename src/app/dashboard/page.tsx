@@ -3,6 +3,15 @@
 import { useEffect } from "react";
 import { useAuthStore } from "@/stores/auth";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
+import {
+  Wallet,
+  TrendingUp,
+  TrendingDown,
+  PiggyBank,
+  Building2,
+  CreditCard,
+  LineChart,
+} from "lucide-react";
 
 export default function Dashboard() {
   const { user, loading, initialize } = useAuthStore();
@@ -12,6 +21,16 @@ export default function Dashboard() {
       initialize();
     }
   }, [user, loading, initialize]);
+
+  // Function to format currency in Indian Rupees
+  const formatINR = (amount: number) => {
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
 
   if (loading) {
     return (
@@ -49,29 +68,122 @@ export default function Dashboard() {
         </div>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h3 className="text-lg font-medium text-gray-900">Total Balance</h3>
-            <p className="text-3xl font-bold text-green-600">$12,450.00</p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Total Balance Card */}
+          <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-blue-500">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="p-3 bg-blue-100 rounded-full">
+                  <Wallet className="h-6 w-6 text-blue-600" />
+                </div>
+                <div className="ml-4">
+                  <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide">
+                    Total Balance
+                  </h3>
+                  <p className="text-3xl font-bold text-gray-900 mt-1">
+                    {formatINR(1245000)}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center text-green-600">
+                  <TrendingUp className="h-4 w-4 mr-1" />
+                  <span className="text-sm font-medium">Income</span>
+                </div>
+                <span className="text-sm font-semibold text-green-600">
+                  {formatINR(420000)}
+                </span>
+              </div>
+              <div className="flex justify-between items-center mt-2">
+                <div className="flex items-center text-red-600">
+                  <TrendingDown className="h-4 w-4 mr-1" />
+                  <span className="text-sm font-medium">Expenses</span>
+                </div>
+                <span className="text-sm font-semibold text-red-600">
+                  {formatINR(315000)}
+                </span>
+              </div>
+            </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h3 className="text-lg font-medium text-gray-900">
-              Monthly Income
-            </h3>
-            <p className="text-3xl font-bold text-blue-600">$4,200.00</p>
+          {/* Net Worth Card */}
+          <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-green-500">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="p-3 bg-green-100 rounded-full">
+                  <PiggyBank className="h-6 w-6 text-green-600" />
+                </div>
+                <div className="ml-4">
+                  <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide">
+                    Net Worth
+                  </h3>
+                  <p className="text-3xl font-bold text-gray-900 mt-1">
+                    {formatINR(1850000)}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center text-blue-600">
+                  <Building2 className="h-4 w-4 mr-1" />
+                  <span className="text-sm font-medium">Assets</span>
+                </div>
+                <span className="text-sm font-semibold text-blue-600">
+                  {formatINR(2150000)}
+                </span>
+              </div>
+              <div className="flex justify-between items-center mt-2">
+                <div className="flex items-center text-orange-600">
+                  <CreditCard className="h-4 w-4 mr-1" />
+                  <span className="text-sm font-medium">Liabilities</span>
+                </div>
+                <span className="text-sm font-semibold text-orange-600">
+                  {formatINR(300000)}
+                </span>
+              </div>
+            </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h3 className="text-lg font-medium text-gray-900">
-              Monthly Expenses
-            </h3>
-            <p className="text-3xl font-bold text-red-600">$3,150.00</p>
-          </div>
-
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h3 className="text-lg font-medium text-gray-900">Savings</h3>
-            <p className="text-3xl font-bold text-purple-600">$8,300.00</p>
+          {/* Total Investments Card */}
+          <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-purple-500">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="p-3 bg-purple-100 rounded-full">
+                  <LineChart className="h-6 w-6 text-purple-600" />
+                </div>
+                <div className="ml-4">
+                  <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide">
+                    Total Investments
+                  </h3>
+                  <p className="text-3xl font-bold text-gray-900 mt-1">
+                    {formatINR(875000)}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-gray-600">Stocks</span>
+                <span className="font-semibold text-gray-900">
+                  {formatINR(450000)}
+                </span>
+              </div>
+              <div className="flex justify-between items-center mt-1 text-sm">
+                <span className="text-gray-600">Mutual Funds</span>
+                <span className="font-semibold text-gray-900">
+                  {formatINR(325000)}
+                </span>
+              </div>
+              <div className="flex justify-between items-center mt-1 text-sm">
+                <span className="text-gray-600">Bonds & FDs</span>
+                <span className="font-semibold text-gray-900">
+                  {formatINR(100000)}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -89,7 +201,9 @@ export default function Dashboard() {
                   <p className="font-medium">Grocery Store</p>
                   <p className="text-sm text-gray-500">Today, 2:30 PM</p>
                 </div>
-                <span className="text-red-600 font-medium">-$85.32</span>
+                <span className="text-red-600 font-medium">
+                  -{formatINR(8532)}
+                </span>
               </div>
 
               <div className="flex justify-between items-center py-2 border-b">
@@ -97,7 +211,9 @@ export default function Dashboard() {
                   <p className="font-medium">Salary Deposit</p>
                   <p className="text-sm text-gray-500">Yesterday, 9:00 AM</p>
                 </div>
-                <span className="text-green-600 font-medium">+$2,100.00</span>
+                <span className="text-green-600 font-medium">
+                  +{formatINR(210000)}
+                </span>
               </div>
 
               <div className="flex justify-between items-center py-2 border-b">
@@ -105,7 +221,9 @@ export default function Dashboard() {
                   <p className="font-medium">Electric Bill</p>
                   <p className="text-sm text-gray-500">2 days ago, 3:15 PM</p>
                 </div>
-                <span className="text-red-600 font-medium">-$120.50</span>
+                <span className="text-red-600 font-medium">
+                  -{formatINR(12050)}
+                </span>
               </div>
             </div>
           </div>

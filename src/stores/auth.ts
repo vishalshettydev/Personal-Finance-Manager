@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { User } from "@supabase/supabase-js";
-import { supabase } from "@/lib/supabase";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { toast } from "sonner";
 
 interface AuthState {
@@ -17,6 +17,11 @@ export const useAuthStore = create<AuthState>((set) => ({
   loading: true,
 
   signIn: async (email: string, password: string) => {
+    if (!isSupabaseConfigured()) {
+      toast.error("Authentication service is not configured");
+      throw new Error("Supabase not configured");
+    }
+
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -40,6 +45,11 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   signUp: async (email: string, password: string) => {
+    if (!isSupabaseConfigured()) {
+      toast.error("Authentication service is not configured");
+      throw new Error("Supabase not configured");
+    }
+
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -57,6 +67,13 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   signOut: async () => {
+    if (!isSupabaseConfigured()) {
+      // Just clear local state if Supabase isn't configured
+      set({ user: null, loading: false });
+      window.location.href = "/login";
+      return;
+    }
+
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
@@ -73,6 +90,12 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   initialize: async () => {
+    if (!isSupabaseConfigured()) {
+      console.warn("Supabase not configured, skipping auth initialization");
+      set({ user: null, loading: false });
+      return;
+    }
+
     try {
       const {
         data: { user },

@@ -1,28 +1,34 @@
 import { createBrowserClient } from "@supabase/ssr";
 import { Database } from "./database.types";
 
-// Check for environment variables with more specific error handling
+// Get environment variables safely
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-// Only throw error if we're not in build mode and vars are missing
-if (!supabaseUrl && typeof window !== "undefined") {
-  throw new Error("Missing env.NEXT_PUBLIC_SUPABASE_URL");
-}
-if (!supabaseAnonKey && typeof window !== "undefined") {
-  throw new Error("Missing env.NEXT_PUBLIC_SUPABASE_ANON_KEY");
+// Check if we have the required environment variables
+const hasValidEnvVars = Boolean(supabaseUrl && supabaseAnonKey);
+
+// Log warning if environment variables are missing
+if (!hasValidEnvVars) {
+  console.warn(
+    "Supabase environment variables are missing. Authentication will not work."
+  );
 }
 
 // Create a single supabase client for interacting with your database
-// Use fallback values during build to prevent errors
+// Always create a client with fallback values to prevent errors
 export const supabase = createBrowserClient<Database>(
   supabaseUrl || "https://placeholder.supabase.co",
-  supabaseAnonKey || "placeholder-key"
+  supabaseAnonKey ||
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsYWNlaG9sZGVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE2NDUxOTI3MjYsImV4cCI6MTk2MDc2ODcyNn0.placeholder"
 );
 
 export async function testSupabaseConnection() {
-  // Don't test connection during build or when vars are missing
-  if (!supabaseUrl || !supabaseAnonKey || typeof window === "undefined") {
+  // Don't test connection if environment variables are missing
+  if (!hasValidEnvVars) {
+    console.warn(
+      "Cannot test Supabase connection - environment variables missing"
+    );
     return false;
   }
 
@@ -38,4 +44,9 @@ export async function testSupabaseConnection() {
     console.error("Supabase connection failed:", error);
     return false;
   }
+}
+
+// Helper function to check if Supabase is properly configured
+export function isSupabaseConfigured(): boolean {
+  return hasValidEnvVars;
 }

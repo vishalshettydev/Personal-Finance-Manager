@@ -1,20 +1,31 @@
 import { createBrowserClient } from "@supabase/ssr";
 import { Database } from "./database.types";
 
-if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+// Check for environment variables with more specific error handling
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+// Only throw error if we're not in build mode and vars are missing
+if (!supabaseUrl && typeof window !== "undefined") {
   throw new Error("Missing env.NEXT_PUBLIC_SUPABASE_URL");
 }
-if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+if (!supabaseAnonKey && typeof window !== "undefined") {
   throw new Error("Missing env.NEXT_PUBLIC_SUPABASE_ANON_KEY");
 }
 
 // Create a single supabase client for interacting with your database
+// Use fallback values during build to prevent errors
 export const supabase = createBrowserClient<Database>(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  supabaseUrl || "https://placeholder.supabase.co",
+  supabaseAnonKey || "placeholder-key"
 );
 
 export async function testSupabaseConnection() {
+  // Don't test connection during build or when vars are missing
+  if (!supabaseUrl || !supabaseAnonKey || typeof window === "undefined") {
+    return false;
+  }
+
   try {
     const { data, error } = await supabase
       .from("accounts")

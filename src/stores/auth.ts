@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { subscribeWithSelector } from "zustand/middleware";
 import { User } from "@supabase/supabase-js";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { toast } from "sonner";
@@ -12,104 +13,112 @@ interface AuthState {
   initialize: () => Promise<void>;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
-  user: null,
-  loading: true,
+export const useAuthStore = create<AuthState>()(
+  subscribeWithSelector((set) => ({
+    user: null,
+    loading: true,
 
-  signIn: async (email: string, password: string) => {
-    if (!isSupabaseConfigured()) {
-      toast.error("Authentication service is not configured");
-      throw new Error("Supabase not configured");
-    }
-
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
-        throw error;
+    signIn: async (email: string, password: string) => {
+      if (!isSupabaseConfigured()) {
+        toast.error("Authentication service is not configured");
+        throw new Error("Supabase not configured");
       }
 
-      set({ user: data.user, loading: false });
-      toast.success("Signed in successfully");
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
 
-      // Force a navigation to dashboard instead of reloading
-      // This will trigger the middleware with the new session
-      window.location.href = "/dashboard";
-    } catch (error) {
-      toast.error("Failed to sign in");
-      throw error;
-    }
-  },
+        if (error) {
+          throw error;
+        }
 
-  signUp: async (email: string, password: string) => {
-    if (!isSupabaseConfigured()) {
-      toast.error("Authentication service is not configured");
-      throw new Error("Supabase not configured");
-    }
+        set({ user: data.user, loading: false });
+        toast.success("Signed in successfully");
+      } catch (error) {
+        set({ loading: false });
+        toast.error("Failed to sign in");
+        throw error;
+      }
+    },
 
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
+    signUp: async (email: string, password: string) => {
+      if (!isSupabaseConfigured()) {
+        toast.error("Authentication service is not configured");
+        throw new Error("Supabase not configured");
+      }
 
-      if (error) throw error;
+      try {
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+        });
 
-      set({ user: data.user, loading: false });
-      toast.success("Account created successfully");
-    } catch (error) {
-      toast.error("Failed to create account");
-      throw error;
-    }
-  },
+        if (error) throw error;
 
-  signOut: async () => {
-    if (!isSupabaseConfigured()) {
-      // Just clear local state if Supabase isn't configured
-      set({ user: null, loading: false });
-      window.location.href = "/login";
-      return;
-    }
+        set({ user: data.user, loading: false });
+        toast.success("Account created successfully");
+      } catch (error) {
+        set({ loading: false });
+        toast.error("Failed to create account");
+        throw error;
+      }
+    },
 
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+    signOut: async () => {
+      if (!isSupabaseConfigured()) {
+        set({ user: null, loading: false });
+        window.location.href = "/login";
+        return;
+      }
 
-      set({ user: null, loading: false });
-      toast.success("Signed out successfully");
+      try {
+        const { error } = await supabase.auth.signOut();
+        if (error) throw error;
 
-      // Use window.location for sign out to ensure clean redirect
-      window.location.href = "/login";
-    } catch (error) {
-      toast.error("Failed to sign out");
-      throw error;
-    }
-  },
+        set({ user: null, loading: false });
+        toast.success("Signed out successfully");
+        window.location.href = "/login";
+      } catch (error) {
+        set({ loading: false });
+        toast.error("Failed to sign out");
+        throw error;
+      }
+    },
 
-  initialize: async () => {
-    if (!isSupabaseConfigured()) {
-      console.warn("Supabase not configured, skipping auth initialization");
-      set({ user: null, loading: false });
-      return;
-    }
+    initialize: async () => {
+      if (!isSupabaseConfigured()) {
+        set({ user: null, loading: false });
+        return;
+      }
 
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      try {
+        const {
+          data: { user },
+          error,
+        } = await supabase.auth.getUser();
 
-      set({ user, loading: false });
+        if (error) {
+          set({ user: null, loading: false });
+        } else {
+          set({ user, loading: false });
+        }
 
-      // Listen for auth changes but don't automatically redirect
-      supabase.auth.onAuthStateChange((event, session) => {
-        set({ user: session?.user ?? null, loading: false });
-      });
-    } catch (error) {
-      set({ loading: false });
-      console.error("Auth initialization error:", error);
-    }
-  },
-}));
+        supabase.auth.onAuthStateChange((event, session) => {
+          if (event === "SIGNED_IN" && session?.user) {
+            set({ user: session.user, loading: false });
+          } else if (event === "SIGNED_OUT") {
+            set({ user: null, loading: false });
+          } else if (event === "TOKEN_REFRESHED" && session?.user) {
+            set({ user: session.user, loading: false });
+          } else {
+            set({ user: session?.user ?? null, loading: false });
+          }
+        });
+      } catch {
+        set({ user: null, loading: false });
+      }
+    },
+  }))
+);

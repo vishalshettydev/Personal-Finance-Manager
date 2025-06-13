@@ -5,16 +5,6 @@ import { Database } from "./database.types";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-// Debug logging for environment variables
-console.log("Environment variable check:", {
-  hasUrl: !!supabaseUrl,
-  hasKey: !!supabaseAnonKey,
-  urlPrefix: supabaseUrl ? supabaseUrl.substring(0, 20) + "..." : "undefined",
-  keyPrefix: supabaseAnonKey
-    ? supabaseAnonKey.substring(0, 20) + "..."
-    : "undefined",
-});
-
 // Check if we have the required environment variables
 const hasValidEnvVars = Boolean(supabaseUrl && supabaseAnonKey);
 
@@ -26,8 +16,6 @@ if (!hasValidEnvVars) {
   console.warn(
     "Make sure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set"
   );
-} else {
-  console.log("✅ Supabase environment variables loaded successfully");
 }
 
 // Create a single supabase client for interacting with your database

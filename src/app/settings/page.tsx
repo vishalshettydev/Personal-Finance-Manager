@@ -309,15 +309,15 @@ export default function Settings() {
     const Icon = node.icon;
 
     const indentationStyle = {
-      paddingLeft: `${level * 1.5 + 0.5}rem`,
+      paddingLeft: `${level * 1 + 0.5}rem`,
     };
 
     return (
       <div key={node.id}>
         <div
           style={indentationStyle}
-          className={`flex items-center w-full p-2 text-left hover:bg-gray-50 rounded-lg transition-colors cursor-pointer ${
-            level > 0 ? "border-l border-gray-200 ml-2" : ""
+          className={`flex items-center w-full p-2 sm:p-3 text-left hover:bg-gray-50 rounded-lg transition-colors cursor-pointer ${
+            level > 0 ? "border-l border-gray-200 ml-1 sm:ml-2" : ""
           } min-w-0`}
           onClick={() => hasChildren && toggleNode(node.id)}
         >
@@ -332,15 +332,23 @@ export default function Settings() {
           )}
 
           <Icon
-            className={`h-4 w-4 mr-3 text-gray-600 flex-shrink-0 ${
-              level === 0 ? "h-5 w-5" : level === 1 ? "h-4 w-4" : "h-3 w-3"
+            className={`mr-2 sm:mr-3 text-gray-600 flex-shrink-0 ${
+              level === 0
+                ? "h-4 w-4 sm:h-5 sm:w-5"
+                : level === 1
+                ? "h-3 w-3 sm:h-4 sm:w-4"
+                : "h-3 w-3"
             }`}
           />
 
           <div className="flex-1 min-w-0">
             <span
               className={`font-medium text-gray-900 ${
-                level === 0 ? "text-base" : level === 1 ? "text-sm" : "text-xs"
+                level === 0
+                  ? "text-sm sm:text-base"
+                  : level === 1
+                  ? "text-xs sm:text-sm"
+                  : "text-xs"
               }`}
             >
               {node.name}
@@ -354,11 +362,11 @@ export default function Settings() {
 
           {node.balance !== undefined && (
             <span
-              className={`font-semibold flex-shrink-0 ml-2 text-right ${
-                level === 0 ? "text-sm" : "text-xs"
+              className={`font-semibold flex-shrink-0 ml-1 sm:ml-2 text-right ${
+                level === 0 ? "text-xs sm:text-sm" : "text-xs"
               } ${
                 node.balance >= 0 ? "text-green-600" : "text-red-600"
-              } min-w-0 truncate`}
+              } min-w-0 truncate max-w-[80px] sm:max-w-none`}
             >
               {formatINR(Math.abs(node.balance))}
             </span>
@@ -463,41 +471,58 @@ export default function Settings() {
         </div>
 
         <Tabs defaultValue="accounts" className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="accounts" className="flex items-center gap-2">
-              <Landmark className="h-4 w-4" />
-              Accounts
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 h-auto">
+            <TabsTrigger
+              value="accounts"
+              className="flex items-center gap-1 md:gap-2 text-xs md:text-sm p-2 md:p-3"
+            >
+              <Landmark className="h-3 w-3 md:h-4 md:w-4" />
+              <span className="hidden sm:inline">Accounts</span>
+              <span className="sm:hidden">Acc</span>
             </TabsTrigger>
-            <TabsTrigger value="profile" className="flex items-center gap-2">
-              <User className="h-4 w-4" />
-              Profile
+            <TabsTrigger
+              value="profile"
+              className="flex items-center gap-1 md:gap-2 text-xs md:text-sm p-2 md:p-3"
+            >
+              <User className="h-3 w-3 md:h-4 md:w-4" />
+              <span className="hidden sm:inline">Profile</span>
+              <span className="sm:hidden">Pro</span>
             </TabsTrigger>
             <TabsTrigger
               value="notifications"
-              className="flex items-center gap-2"
+              className="flex items-center gap-1 md:gap-2 text-xs md:text-sm p-2 md:p-3 col-span-2 md:col-span-1"
             >
-              <Bell className="h-4 w-4" />
-              Notifications
+              <Bell className="h-3 w-3 md:h-4 md:w-4" />
+              <span className="hidden sm:inline">Notifications</span>
+              <span className="sm:hidden">Notif</span>
             </TabsTrigger>
-            <TabsTrigger value="security" className="flex items-center gap-2">
-              <Shield className="h-4 w-4" />
-              Security
+            <TabsTrigger
+              value="security"
+              className="flex items-center gap-1 md:gap-2 text-xs md:text-sm p-2 md:p-3"
+            >
+              <Shield className="h-3 w-3 md:h-4 md:w-4" />
+              <span className="hidden sm:inline">Security</span>
+              <span className="sm:hidden">Sec</span>
             </TabsTrigger>
-            <TabsTrigger value="appearance" className="flex items-center gap-2">
-              <Palette className="h-4 w-4" />
-              Appearance
+            <TabsTrigger
+              value="appearance"
+              className="flex items-center gap-1 md:gap-2 text-xs md:text-sm p-2 md:p-3"
+            >
+              <Palette className="h-3 w-3 md:h-4 md:w-4" />
+              <span className="hidden sm:inline">Appearance</span>
+              <span className="sm:hidden">App</span>
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="accounts" className="space-y-6">
             <Card className="overflow-hidden">
-              <CardHeader className="flex flex-row items-center justify-between">
+              <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
                 <div className="min-w-0 flex-1">
-                  <CardTitle className="flex items-center gap-2">
-                    <Landmark className="h-5 w-5" />
+                  <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
+                    <Landmark className="h-4 w-4 md:h-5 md:w-5" />
                     Chart of Accounts
                   </CardTitle>
-                  <CardDescription>
+                  <CardDescription className="text-sm">
                     Manage your account hierarchy and create new accounts
                   </CardDescription>
                 </div>
@@ -506,7 +531,7 @@ export default function Settings() {
                   onOpenChange={setIsAccountModalOpen}
                 >
                   <DialogTrigger asChild>
-                    <Button className="flex items-center gap-2">
+                    <Button className="flex items-center gap-2 w-full sm:w-auto">
                       <Plus className="h-4 w-4" />
                       Add Account
                     </Button>
@@ -656,7 +681,7 @@ export default function Settings() {
                 </Dialog>
               </CardHeader>
               <CardContent>
-                <div className="h-[calc(100vh-400px)] overflow-y-auto overflow-x-hidden">
+                <div className="h-[calc(100vh-300px)] sm:h-[calc(100vh-400px)] overflow-y-auto overflow-x-hidden">
                   {accountsTree.map((node) => (
                     <TreeNodeComponent key={node.id} node={node} />
                   ))}

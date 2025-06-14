@@ -12,6 +12,8 @@ import {
   PiggyBank,
   ChevronDown,
   ChevronRight,
+  Expand,
+  Minimize2,
 } from "lucide-react";
 
 // Types
@@ -205,6 +207,32 @@ export default function ChartOfAccounts({
     );
   };
 
+  // Get all node IDs that have children (can be expanded)
+  const getAllExpandableNodeIds = (nodes: TreeNode[]): string[] => {
+    const expandableIds: string[] = [];
+
+    const traverse = (nodeList: TreeNode[]) => {
+      nodeList.forEach((node) => {
+        if (node.children && node.children.length > 0) {
+          expandableIds.push(node.id);
+          traverse(node.children);
+        }
+      });
+    };
+
+    traverse(nodes);
+    return expandableIds;
+  };
+
+  const expandAll = () => {
+    const allExpandableIds = getAllExpandableNodeIds(accountsTree);
+    setExpandedNodes(allExpandableIds);
+  };
+
+  const collapseAll = () => {
+    setExpandedNodes([]);
+  };
+
   // Helper function to count total accounts in a tree
   const getTotalAccounts = (node: TreeNode): number => {
     if (!node.children || node.children.length === 0) return 1;
@@ -347,9 +375,53 @@ export default function ChartOfAccounts({
   return (
     <div className={`${className}`}>
       {showHeader && (
-        <div className="flex items-center gap-2 mb-4">
-          <Landmark className="h-5 w-5" />
-          <h2 className="text-xl font-bold text-gray-900">Chart of Accounts</h2>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Landmark className="h-5 w-5" />
+            <h2 className="text-xl font-bold text-gray-900">
+              Chart of Accounts
+            </h2>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={expandAll}
+              className="flex items-center gap-1 px-2 py-1 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+              title="Expand All"
+            >
+              <Expand className="h-3 w-3" />
+              <span className="hidden sm:inline">Expand All</span>
+            </button>
+            <button
+              onClick={collapseAll}
+              className="flex items-center gap-1 px-2 py-1 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+              title="Collapse All"
+            >
+              <Minimize2 className="h-3 w-3" />
+              <span className="hidden sm:inline">Collapse All</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Controls for when header is hidden */}
+      {!showHeader && accountsTree.length > 0 && (
+        <div className="flex items-center justify-end gap-2 mb-3">
+          <button
+            onClick={expandAll}
+            className="flex items-center gap-1 px-2 py-1 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+            title="Expand All"
+          >
+            <Expand className="h-3 w-3" />
+            <span className="hidden sm:inline">Expand All</span>
+          </button>
+          <button
+            onClick={collapseAll}
+            className="flex items-center gap-1 px-2 py-1 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+            title="Collapse All"
+          >
+            <Minimize2 className="h-3 w-3" />
+            <span className="hidden sm:inline">Collapse All</span>
+          </button>
         </div>
       )}
 

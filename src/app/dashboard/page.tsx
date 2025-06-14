@@ -13,7 +13,6 @@ import {
   CreditCard,
   LineChart,
   Receipt,
-  Smartphone,
   AlertCircle,
   X,
   Plus,
@@ -70,6 +69,27 @@ interface HierarchicalAccount extends Account {
   children: HierarchicalAccount[];
 }
 
+interface TransactionData {
+  id: string;
+  user_id: string | null;
+  reference_number: string | null;
+  description: string;
+  transaction_date: string;
+  total_amount: number;
+  notes: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  transaction_entries: {
+    id: string;
+    transaction_id: string | null;
+    account_id: string | null;
+    debit_amount: number | null;
+    credit_amount: number | null;
+    description: string | null;
+    accounts: Account | null;
+  }[];
+}
+
 export default function Dashboard() {
   const { user, loading, initialize } = useAuthStore();
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
@@ -78,6 +98,16 @@ export default function Dashboard() {
   // Data states
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
+  const [transactions, setTransactions] = useState<TransactionData[]>([]);
+
+  // Transaction search and filter states
+  const [transactionSearch, setTransactionSearch] = useState("");
+  const [transactionSortBy, setTransactionSortBy] = useState<"date" | "amount">(
+    "date"
+  );
+  const [transactionSortOrder, setTransactionSortOrder] = useState<
+    "asc" | "desc"
+  >("desc");
 
   // Transaction form state - Double Entry
   const [transactionForm, setTransactionForm] = useState({
@@ -110,6 +140,7 @@ export default function Dashboard() {
     if (user) {
       fetchAccounts();
       fetchTags();
+      fetchAllTransactions();
     }
   }, [user]);
 
@@ -145,7 +176,6 @@ export default function Dashboard() {
         .order("name");
 
       if (error) throw error;
-      console.log("Fetched accounts:", data); // Debug log
       setAccounts(data || []);
     } catch (error) {
       console.error("Error fetching accounts:", error);
@@ -168,6 +198,119 @@ export default function Dashboard() {
     } catch (error) {
       console.error("Error fetching tags:", error);
     }
+  };
+
+  // Fetch all transactions (income, expense, and transfers)
+  const fetchAllTransactions = async () => {
+    if (!user) return;
+
+    try {
+      // Fetch all transactions with their entries
+      const { data: transactionsData, error: transactionsError } =
+        await supabase
+          .from("transactions")
+          .select(
+            `
+          *,
+          transaction_entries (
+            *,
+            accounts (
+              *,
+              account_types (
+                *
+              )
+            )
+          )
+        `
+          )
+          .eq("user_id", user.id)
+          .order("transaction_date", { ascending: false })
+          .order("created_at", { ascending: false })
+          .limit(200);
+
+      if (transactionsError) throw transactionsError;
+
+      // Filter and categorize transactions
+      const allTransactions =
+        transactionsData?.filter((transaction) => {
+          const hasIncomeExpense = transaction.transaction_entries?.some(
+            (entry) =>
+              ["INCOME", "EXPENSE"].includes(
+                entry.accounts?.account_types?.category || ""
+              )
+          );
+
+          const hasAssetLiability = transaction.transaction_entries?.some(
+            (entry) =>
+              ["ASSET", "LIABILITY"].includes(
+                entry.accounts?.account_types?.category || ""
+              )
+          );
+
+          // Include: 1) Income/Expense transactions, 2) Transfers between Asset/Liability accounts
+          const isTransfer =
+            !hasIncomeExpense &&
+            hasAssetLiability &&
+            transaction.transaction_entries?.length === 2;
+
+          return hasIncomeExpense || isTransfer;
+        }) || [];
+
+      setTransactions(allTransactions.slice(0, 100)); // Limit to 100 after filtering
+    } catch (error) {
+      console.error("Error fetching transactions:", error);
+    }
+  };
+
+  // Filter and sort transactions based on search and sort criteria
+  const getFilteredAndSortedTransactions = () => {
+    let filtered = transactions;
+
+    // Apply search filter
+    if (transactionSearch.trim()) {
+      const searchTerm = transactionSearch.toLowerCase();
+      filtered = transactions.filter(
+        (transaction) =>
+          transaction.description.toLowerCase().includes(searchTerm) ||
+          transaction.reference_number?.toLowerCase().includes(searchTerm) ||
+          transaction.notes?.toLowerCase().includes(searchTerm) ||
+          transaction.transaction_entries?.some((entry) =>
+            entry.accounts?.name?.toLowerCase().includes(searchTerm)
+          )
+      );
+    }
+
+    // Apply sorting
+    const sorted = [...filtered].sort((a, b) => {
+      if (transactionSortBy === "date") {
+        const dateA = new Date(a.transaction_date).getTime();
+        const dateB = new Date(b.transaction_date).getTime();
+        return transactionSortOrder === "desc" ? dateB - dateA : dateA - dateB;
+      } else if (transactionSortBy === "amount") {
+        const amountA = a.total_amount;
+        const amountB = b.total_amount;
+        return transactionSortOrder === "desc"
+          ? amountB - amountA
+          : amountA - amountB;
+      }
+      return 0;
+    });
+
+    return sorted;
+  };
+
+  // Determine transaction type and category
+  const getTransactionType = (transaction: TransactionData) => {
+    const hasIncome = transaction.transaction_entries?.some(
+      (entry) => entry.accounts?.account_types?.category === "INCOME"
+    );
+    const hasExpense = transaction.transaction_entries?.some(
+      (entry) => entry.accounts?.account_types?.category === "EXPENSE"
+    );
+
+    if (hasIncome) return { type: "income", label: "Income" };
+    if (hasExpense) return { type: "expense", label: "Expense" };
+    return { type: "transfer", label: "Transfer" };
   };
 
   // Create a new tag instantly
@@ -397,8 +540,8 @@ export default function Dashboard() {
       });
       setTagSearchTerm("");
 
-      // Show success feedback without alert
-      console.log("Transaction added successfully!");
+      // Refresh transactions list
+      fetchAllTransactions();
     } catch (error) {
       console.error("Error creating transaction:", error);
       alert("Error creating transaction. Please try again.");
@@ -1116,7 +1259,7 @@ export default function Dashboard() {
           <div className="lg:col-span-6">
             <div className="bg-white rounded-lg shadow">
               <div className="p-6 border-b border-gray-200">
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center mb-4">
                   <h2 className="text-xl font-bold text-gray-900">
                     Recent Transactions
                   </h2>
@@ -1124,101 +1267,227 @@ export default function Dashboard() {
                     View All
                   </Button>
                 </div>
+
+                {/* Search and Sort Controls */}
+                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                  <div className="relative flex-1 max-w-md">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      value={transactionSearch}
+                      onChange={(e) => setTransactionSearch(e.target.value)}
+                      placeholder="Search transactions..."
+                      className="pl-10 h-9"
+                    />
+                  </div>
+
+                  <div className="flex gap-2">
+                    <select
+                      value={transactionSortBy}
+                      onChange={(e) =>
+                        setTransactionSortBy(
+                          e.target.value as "date" | "amount"
+                        )
+                      }
+                      className="px-3 py-1.5 border border-gray-300 rounded-md text-sm bg-white"
+                    >
+                      <option value="date">Sort by Date</option>
+                      <option value="amount">Sort by Amount</option>
+                    </select>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setTransactionSortOrder(
+                          transactionSortOrder === "desc" ? "asc" : "desc"
+                        )
+                      }
+                      className="px-2"
+                    >
+                      {transactionSortOrder === "desc" ? (
+                        <ChevronDown className="h-4 w-4" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4 rotate-180" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
               </div>
               <div className="p-6">
                 <div className="space-y-4">
-                  <div className="flex justify-between items-center py-3 border-b hover:bg-gray-50 rounded-lg px-3 transition-colors">
-                    <div className="flex items-center">
-                      <div className="p-2 bg-red-100 rounded-full mr-4">
-                        <TrendingDown className="h-4 w-4 text-red-600" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">
-                          Grocery Store
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          HDFC Primary Savings • Today, 2:30 PM
-                        </p>
-                      </div>
-                    </div>
-                    <span className="text-red-600 font-semibold">
-                      -{formatINR(8532)}
-                    </span>
-                  </div>
+                  {(() => {
+                    const filteredSortedTransactions =
+                      getFilteredAndSortedTransactions();
 
-                  <div className="flex justify-between items-center py-3 border-b hover:bg-gray-50 rounded-lg px-3 transition-colors">
-                    <div className="flex items-center">
-                      <div className="p-2 bg-green-100 rounded-full mr-4">
-                        <TrendingUp className="h-4 w-4 text-green-600" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">
-                          Salary Deposit
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          ICICI Salary Account • Yesterday, 9:00 AM
-                        </p>
-                      </div>
-                    </div>
-                    <span className="text-green-600 font-semibold">
-                      +{formatINR(210000)}
-                    </span>
-                  </div>
+                    if (filteredSortedTransactions.length === 0) {
+                      return (
+                        <div className="text-center py-12">
+                          <Receipt className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                          <p className="text-gray-500">
+                            {transactionSearch.trim()
+                              ? "No transactions found matching your search"
+                              : "No transactions found"}
+                          </p>
+                          <p className="text-sm text-gray-400">
+                            {transactionSearch.trim()
+                              ? "Try adjusting your search terms"
+                              : "Start by adding some transactions"}
+                          </p>
+                        </div>
+                      );
+                    }
 
-                  <div className="flex justify-between items-center py-3 border-b hover:bg-gray-50 rounded-lg px-3 transition-colors">
-                    <div className="flex items-center">
-                      <div className="p-2 bg-red-100 rounded-full mr-4">
-                        <TrendingDown className="h-4 w-4 text-red-600" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">
-                          Electric Bill
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          HDFC Business Current • 2 days ago, 3:15 PM
-                        </p>
-                      </div>
-                    </div>
-                    <span className="text-red-600 font-semibold">
-                      -{formatINR(12050)}
-                    </span>
-                  </div>
+                    return filteredSortedTransactions.map((transaction) => {
+                      const transactionType = getTransactionType(transaction);
 
-                  <div className="flex justify-between items-center py-3 border-b hover:bg-gray-50 rounded-lg px-3 transition-colors">
-                    <div className="flex items-center">
-                      <div className="p-2 bg-blue-100 rounded-full mr-4">
-                        <Smartphone className="h-4 w-4 text-blue-600" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">
-                          Mobile Recharge
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          Paytm Wallet • 3 days ago, 10:15 AM
-                        </p>
-                      </div>
-                    </div>
-                    <span className="text-red-600 font-semibold">
-                      -{formatINR(599)}
-                    </span>
-                  </div>
+                      // Find the primary account for display
+                      let primaryEntry:
+                          | TransactionData["transaction_entries"][0]
+                          | undefined,
+                        secondaryEntry:
+                          | TransactionData["transaction_entries"][0]
+                          | undefined;
 
-                  <div className="flex justify-between items-center py-3 border-b hover:bg-gray-50 rounded-lg px-3 transition-colors">
-                    <div className="flex items-center">
-                      <div className="p-2 bg-purple-100 rounded-full mr-4">
-                        <LineChart className="h-4 w-4 text-purple-600" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">Equity SIP</p>
-                        <p className="text-sm text-gray-500">
-                          Equity Funds • 5 days ago, 8:00 AM
-                        </p>
-                      </div>
-                    </div>
-                    <span className="text-blue-600 font-semibold">
-                      -{formatINR(25000)}
-                    </span>
-                  </div>
+                      if (transactionType.type === "transfer") {
+                        // For transfers, show both accounts
+                        const assetLiabilityEntries =
+                          transaction.transaction_entries.filter((entry) =>
+                            ["ASSET", "LIABILITY"].includes(
+                              entry.accounts?.account_types?.category || ""
+                            )
+                          );
+                        primaryEntry = assetLiabilityEntries[0];
+                        secondaryEntry = assetLiabilityEntries[1];
+                      } else {
+                        // For income/expense, find the income/expense entry
+                        primaryEntry = transaction.transaction_entries.find(
+                          (entry) =>
+                            entry.accounts?.account_types?.category ===
+                              "INCOME" ||
+                            entry.accounts?.account_types?.category ===
+                              "EXPENSE"
+                        );
+                        // Get the other account (asset/liability) for display
+                        secondaryEntry = transaction.transaction_entries.find(
+                          (entry) => entry.id !== primaryEntry?.id
+                        );
+                      }
+
+                      const isIncome = transactionType.type === "income";
+                      const isExpense = transactionType.type === "expense";
+                      const isTransfer = transactionType.type === "transfer";
+
+                      // Use transaction total_amount for display
+                      const amount = transaction.total_amount;
+
+                      const formatDate = (dateString: string) => {
+                        const date = new Date(dateString);
+                        const today = new Date();
+                        const yesterday = new Date(today);
+                        yesterday.setDate(yesterday.getDate() - 1);
+
+                        if (date.toDateString() === today.toDateString()) {
+                          return `Today, ${date.toLocaleTimeString("en-US", {
+                            hour: "numeric",
+                            minute: "2-digit",
+                            hour12: true,
+                          })}`;
+                        } else if (
+                          date.toDateString() === yesterday.toDateString()
+                        ) {
+                          return `Yesterday, ${date.toLocaleTimeString(
+                            "en-US",
+                            {
+                              hour: "numeric",
+                              minute: "2-digit",
+                              hour12: true,
+                            }
+                          )}`;
+                        } else {
+                          const daysAgo = Math.floor(
+                            (today.getTime() - date.getTime()) /
+                              (1000 * 60 * 60 * 24)
+                          );
+                          return `${daysAgo} days ago, ${date.toLocaleTimeString(
+                            "en-US",
+                            {
+                              hour: "numeric",
+                              minute: "2-digit",
+                              hour12: true,
+                            }
+                          )}`;
+                        }
+                      };
+
+                      return (
+                        <div
+                          key={transaction.id}
+                          className="flex justify-between items-center py-3 border-b hover:bg-gray-50 rounded-lg px-3 transition-colors"
+                        >
+                          <div className="flex items-center">
+                            <div
+                              className={`p-2 rounded-full mr-4 ${
+                                isIncome
+                                  ? "bg-green-100"
+                                  : isExpense
+                                  ? "bg-red-100"
+                                  : "bg-blue-100"
+                              }`}
+                            >
+                              {isIncome ? (
+                                <TrendingUp className="h-4 w-4 text-green-600" />
+                              ) : isExpense ? (
+                                <TrendingDown className="h-4 w-4 text-red-600" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4 text-blue-600" />
+                              )}
+                            </div>
+                            <div>
+                              <p className="font-medium text-gray-900">
+                                {transaction.description}
+                              </p>
+                              <p className="text-sm text-gray-500">
+                                {isTransfer ? (
+                                  <>
+                                    {primaryEntry?.accounts?.name || "Account"}{" "}
+                                    →{" "}
+                                    {secondaryEntry?.accounts?.name ||
+                                      "Account"}
+                                  </>
+                                ) : (
+                                  <>
+                                    {secondaryEntry?.accounts?.name ||
+                                      "Account"}
+                                  </>
+                                )}{" "}
+                                • {formatDate(transaction.transaction_date)}
+                              </p>
+                              {transaction.reference_number && (
+                                <p className="text-xs text-gray-400">
+                                  Ref: {transaction.reference_number}
+                                </p>
+                              )}
+                              <p className="text-xs text-gray-400">
+                                {transactionType.label}
+                              </p>
+                            </div>
+                          </div>
+                          <span
+                            className={`font-semibold ${
+                              isIncome
+                                ? "text-green-600"
+                                : isExpense
+                                ? "text-red-600"
+                                : "text-blue-600"
+                            }`}
+                          >
+                            {isIncome ? "+" : isExpense ? "-" : ""}
+                            {formatINR(amount)}
+                          </span>
+                        </div>
+                      );
+                    });
+                  })()}
                 </div>
               </div>
             </div>

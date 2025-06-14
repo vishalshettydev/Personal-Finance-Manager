@@ -198,30 +198,8 @@ export default function ChartOfAccounts({
       const tree = buildAccountTree(accounts);
       setAccountsTree(tree);
 
-      // Auto-expand first two levels to show more hierarchy by default
-      const getExpandableIds = (
-        nodes: TreeNode[],
-        maxLevel: number,
-        currentLevel: number = 0
-      ): string[] => {
-        const ids: string[] = [];
-        if (currentLevel >= maxLevel) return ids;
-
-        nodes.forEach((node) => {
-          if (node.children && node.children.length > 0) {
-            ids.push(node.id);
-            if (currentLevel < maxLevel - 1) {
-              ids.push(
-                ...getExpandableIds(node.children, maxLevel, currentLevel + 1)
-              );
-            }
-          }
-        });
-        return ids;
-      };
-
-      const expandIds = getExpandableIds(tree, 2); // Expand first 2 levels
-      setExpandedNodes(expandIds);
+      // Start with collapsed state by default
+      setExpandedNodes([]);
     }
   }, [accounts]);
 
@@ -259,11 +237,16 @@ export default function ChartOfAccounts({
     setExpandedNodes([]);
   };
 
-  // Helper function to count total accounts in a tree
-  const getTotalAccounts = (node: TreeNode): number => {
-    if (!node.children || node.children.length === 0) return 1;
+  // Helper function to calculate total balance of child accounts
+  const getTotalBalance = (node: TreeNode): number => {
+    if (!node.children || node.children.length === 0) {
+      // For leaf nodes, return their balance (0 if placeholder)
+      return node.is_placeholder ? 0 : node.balance || 0;
+    }
+
+    // For parent nodes, sum all child balances recursively
     return node.children.reduce(
-      (total, child) => total + getTotalAccounts(child),
+      (total, child) => total + getTotalBalance(child),
       0
     );
   };
@@ -366,8 +349,8 @@ export default function ChartOfAccounts({
             )}
 
           {hasChildren && (
-            <span className="ml-auto text-xs text-gray-500 flex-shrink-0 min-w-0">
-              ({getTotalAccounts(node)})
+            <span className="ml-auto text-xs font-medium text-blue-600 flex-shrink-0 min-w-0">
+              {formatINR(getTotalBalance(node))}
             </span>
           )}
         </div>

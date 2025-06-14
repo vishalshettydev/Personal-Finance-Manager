@@ -318,7 +318,7 @@ export default function Settings() {
           style={indentationStyle}
           className={`flex items-center w-full p-2 text-left hover:bg-gray-50 rounded-lg transition-colors cursor-pointer ${
             level > 0 ? "border-l border-gray-200 ml-2" : ""
-          }`}
+          } min-w-0`}
           onClick={() => hasChildren && toggleNode(node.id)}
         >
           {hasChildren ? (
@@ -354,16 +354,18 @@ export default function Settings() {
 
           {node.balance !== undefined && (
             <span
-              className={`font-semibold flex-shrink-0 ml-2 ${
+              className={`font-semibold flex-shrink-0 ml-2 text-right ${
                 level === 0 ? "text-sm" : "text-xs"
-              } ${node.balance >= 0 ? "text-green-600" : "text-red-600"}`}
+              } ${
+                node.balance >= 0 ? "text-green-600" : "text-red-600"
+              } min-w-0 truncate`}
             >
               {formatINR(Math.abs(node.balance))}
             </span>
           )}
 
           {hasChildren && !node.balance && (
-            <span className="ml-auto text-xs text-gray-500 flex-shrink-0">
+            <span className="ml-auto text-xs text-gray-500 flex-shrink-0 min-w-0">
               ({getTotalAccounts(node)})
             </span>
           )}
@@ -488,9 +490,9 @@ export default function Settings() {
           </TabsList>
 
           <TabsContent value="accounts" className="space-y-6">
-            <Card>
+            <Card className="overflow-hidden">
               <CardHeader className="flex flex-row items-center justify-between">
-                <div>
+                <div className="min-w-0 flex-1">
                   <CardTitle className="flex items-center gap-2">
                     <Landmark className="h-5 w-5" />
                     Chart of Accounts
@@ -654,7 +656,7 @@ export default function Settings() {
                 </Dialog>
               </CardHeader>
               <CardContent>
-                <div className="max-h-96 overflow-y-auto">
+                <div className="h-[calc(100vh-400px)] overflow-y-auto overflow-x-hidden">
                   {accountsTree.map((node) => (
                     <TreeNodeComponent key={node.id} node={node} />
                   ))}

@@ -881,13 +881,15 @@ export default function Dashboard() {
                               variant="secondary"
                               className="flex items-center gap-1 px-1.5 py-0.5 text-xs h-6"
                               style={{
-                                backgroundColor: `${tag.color}20`,
-                                color: tag.color,
+                                backgroundColor: `${tag.color || "#3B82F6"}20`,
+                                color: tag.color || "#3B82F6",
                               }}
                             >
                               <div
                                 className="w-1.5 h-1.5 rounded-full"
-                                style={{ backgroundColor: tag.color }}
+                                style={{
+                                  backgroundColor: tag.color || "#3B82F6",
+                                }}
                               />
                               {tag.name}
                               <button

@@ -45,12 +45,19 @@ export interface TransactionEntry {
   account?: Account;
 }
 
+export interface TransactionEntryInput {
+  account_id: string;
+  debit_amount: number;
+  credit_amount: number;
+  description?: string;
+}
+
 export interface Tag {
   id: string;
-  user_id: string;
+  user_id: string | null;
   name: string;
-  color: string;
-  created_at: string;
+  color: string | null;
+  created_at: string | null;
 }
 
 export interface Investment {

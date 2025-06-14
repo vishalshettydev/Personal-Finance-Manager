@@ -40,14 +40,44 @@ import { supabase } from "@/lib/supabase";
 import { Tag } from "@/lib/types";
 import { AccountingEngine } from "@/lib/accounting";
 
+// Define interfaces for better type safety
+interface AccountType {
+  id: string;
+  name: string;
+  category: string;
+}
+
+interface Account {
+  id: string;
+  user_id: string | null;
+  parent_id?: string | null;
+  account_type_id: string | null;
+  name: string;
+  code?: string | null;
+  description?: string | null;
+  is_placeholder?: boolean | null;
+  is_active: boolean | null;
+  balance: number | null;
+  created_at: string | null;
+  updated_at: string | null;
+  account_types?: AccountType | null;
+}
+
+interface HierarchicalAccount extends Account {
+  level: number;
+  isSelectable: boolean;
+  hasChildren: boolean;
+  children: HierarchicalAccount[];
+}
+
 export default function Dashboard() {
   const { user, loading, initialize } = useAuthStore();
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Data states
-  const [accounts, setAccounts] = useState<any[]>([]);
-  const [tags, setTags] = useState<any[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
 
   // Transaction form state - Double Entry
   const [transactionForm, setTransactionForm] = useState({
@@ -188,11 +218,11 @@ export default function Dashboard() {
 
   // Build hierarchical account list with children info
   const buildAccountHierarchy = (
-    accounts: any[],
+    accounts: Account[],
     parentId: string | null = null,
     level = 0
-  ): any[] => {
-    const result: any[] = [];
+  ): HierarchicalAccount[] => {
+    const result: HierarchicalAccount[] = [];
     const children = accounts.filter((acc) => acc.parent_id === parentId);
 
     for (const child of children) {
@@ -564,7 +594,9 @@ export default function Dashboard() {
                               const hierarchicalAccounts =
                                 buildAccountHierarchy(accounts);
 
-                              const renderAccountTree = (account: any): any => {
+                              const renderAccountTree = (
+                                account: HierarchicalAccount
+                              ): React.ReactElement => {
                                 const isSelected =
                                   transactionForm.debit_account_id ===
                                   account.id;
@@ -676,8 +708,8 @@ export default function Dashboard() {
                                   buildAccountHierarchy(accounts);
 
                                 const renderAccountTree = (
-                                  account: any
-                                ): any => {
+                                  account: HierarchicalAccount
+                                ): React.ReactElement => {
                                   const isSelected =
                                     transactionForm.credit_account_id ===
                                     account.id;
@@ -834,7 +866,7 @@ export default function Dashboard() {
                                 className="w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center gap-2 text-blue-600"
                               >
                                 <Plus className="w-3 h-3" />
-                                Create "{tagSearchTerm}"
+                                Create &quot;{tagSearchTerm}&quot;
                               </button>
                             )}
                         </div>

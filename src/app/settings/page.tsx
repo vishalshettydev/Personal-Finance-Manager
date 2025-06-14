@@ -848,7 +848,7 @@ export default function Settings() {
                                 const renderAccountTree = (
                                   account: HierarchicalAccount,
                                   level: number = 0
-                                ): any => {
+                                ): React.ReactElement => {
                                   const isSelected =
                                     accountForm.parent_id === account.id;
                                   const canSelect = true; // All accounts can be parents when creating

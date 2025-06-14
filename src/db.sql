@@ -1,12 +1,37 @@
+-- Enable required extension for UUID generation
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- ========================
 -- ACCOUNT TYPES
+-- ========================
 CREATE TABLE public.account_types (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR NOT NULL UNIQUE,
-  category VARCHAR NOT NULL CHECK (category IN ('DEBIT', 'CREDIT')),
+  category VARCHAR NOT NULL CHECK (category IN ('ASSET', 'LIABILITY', 'EQUITY', 'INCOME', 'EXPENSE', 'SYSTEM')),
+  normal_balance VARCHAR NOT NULL CHECK (normal_balance IN ('DEBIT', 'CREDIT')),
+  description TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- Insert default account types (based on GnuCash model)
+INSERT INTO public.account_types (name, category, normal_balance, description) VALUES
+('A/Payable',     'LIABILITY', 'CREDIT', 'Bills to be paid, vendors'),
+('A/Receivable',  'ASSET',     'DEBIT',  'Customers who owe you money'),
+('Asset',         'ASSET',     'DEBIT',  'Generic asset parent'),
+('Bank',          'ASSET',     'DEBIT',  'Bank accounts'),
+('Cash',          'ASSET',     'DEBIT',  'Physical cash or wallet'),
+('Credit Card',   'LIABILITY', 'CREDIT', 'Credit card liabilities'),
+('Equity',        'EQUITY',    'CREDIT', 'Owner’s equity and opening balances'),
+('Expense',       'EXPENSE',   'DEBIT',  'All types of expenses'),
+('Income',        'INCOME',    'CREDIT', 'Income from all sources'),
+('Liability',     'LIABILITY', 'CREDIT', 'General liabilities'),
+('Mutual Fund',   'ASSET',     'DEBIT',  'Mutual fund investments'),
+('Stock',         'ASSET',     'DEBIT',  'Stock/share investments'),
+('Trading',       'SYSTEM',    'DEBIT',  'Currency balancing placeholder');
+
+-- ========================
 -- ACCOUNTS (Chart of Accounts)
+-- ========================
 CREATE TABLE public.accounts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id),
@@ -21,7 +46,21 @@ CREATE TABLE public.accounts (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- TRANSACTIONS (Double Entry)
+-- Insert default top-level accounts
+INSERT INTO public.accounts (user_id, name, account_type_id)
+SELECT NULL::uuid, 'Assets', id FROM public.account_types WHERE name = 'Asset'
+UNION ALL
+SELECT NULL::uuid, 'Liabilities', id FROM public.account_types WHERE name = 'Liability'
+UNION ALL
+SELECT NULL::uuid, 'Equity', id FROM public.account_types WHERE name = 'Equity'
+UNION ALL
+SELECT NULL::uuid, 'Income', id FROM public.account_types WHERE name = 'Income'
+UNION ALL
+SELECT NULL::uuid, 'Expenses', id FROM public.account_types WHERE name = 'Expense';
+
+-- ========================
+-- TRANSACTIONS (Double Entry System)
+-- ========================
 CREATE TABLE public.transactions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id),
@@ -43,7 +82,9 @@ CREATE TABLE public.transaction_entries (
   description TEXT
 );
 
+-- ========================
 -- TAGGING SUPPORT
+-- ========================
 CREATE TABLE public.tags (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id),
@@ -58,7 +99,9 @@ CREATE TABLE public.transaction_tags (
   PRIMARY KEY (transaction_id, tag_id)
 );
 
--- INVESTMENT MASTER (each investment asset)
+-- ========================
+-- INVESTMENT MASTER
+-- ========================
 CREATE TABLE public.investments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id),
@@ -67,14 +110,16 @@ CREATE TABLE public.investments (
   symbol VARCHAR,
   name VARCHAR NOT NULL,
   quantity NUMERIC DEFAULT 0,
-  purchase_price NUMERIC, -- Average cost per unit
+  purchase_price NUMERIC,
   purchase_date DATE,
   maturity_date DATE,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- INVESTMENT TRANSACTIONS (SIP, Buy/Sell)
+-- ========================
+-- INVESTMENT TRANSACTIONS
+-- ========================
 CREATE TABLE public.investment_transactions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   investment_id UUID REFERENCES public.investments(id),
@@ -87,7 +132,9 @@ CREATE TABLE public.investment_transactions (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- INVESTMENT MARKET PRICE HISTORY (NAV or Stock Price)
+-- ========================
+-- INVESTMENT PRICES (Market NAV or Stock Price)
+-- ========================
 CREATE TABLE public.investment_prices (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id),
@@ -98,7 +145,9 @@ CREATE TABLE public.investment_prices (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- ========================
 -- BUDGETING
+-- ========================
 CREATE TABLE public.budgets (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id),
@@ -118,7 +167,9 @@ CREATE TABLE public.budget_categories (
   spent_amount NUMERIC DEFAULT 0
 );
 
--- ACCOUNT BALANCE SNAPSHOTS (Optional - for fast analytics)
+-- ========================
+-- ACCOUNT BALANCE SNAPSHOTS
+-- ========================
 CREATE TABLE public.account_balance_snapshots (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   account_id UUID REFERENCES public.accounts(id),

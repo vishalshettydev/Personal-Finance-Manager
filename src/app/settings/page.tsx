@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { useAuthStore } from "@/stores/auth";
 import { useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
+import { supabase } from "@/lib/supabase";
+import ChartOfAccounts from "@/components/ChartOfAccounts";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -31,36 +33,36 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Building2,
-  CreditCard,
-  TrendingUp,
-  Wallet,
-  Landmark,
-  PiggyBank,
-  ChevronDown,
-  ChevronRight,
-  Plus,
-  User,
-  Bell,
-  Shield,
-  Palette,
-} from "lucide-react";
+import { Landmark, Plus, User, Bell, Shield, Palette } from "lucide-react";
 
 // Types
-interface TreeNode {
-  id: string;
-  name: string;
-  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
-  balance?: number;
-  type?: string;
-  children?: TreeNode[];
-}
 
 interface AccountType {
   id: string;
   name: string;
-  category: "DEBIT" | "CREDIT";
+  category: string;
+  normal_balance?: string;
+  description?: string;
+  created_at?: string | null;
+}
+
+interface Account {
+  id: string;
+  user_id: string | null;
+  parent_id?: string | null;
+  account_type_id: string | null;
+  name: string;
+  code?: string | null;
+  description?: string | null;
+  is_active: boolean | null;
+  balance: number | null;
+  created_at: string | null;
+  updated_at: string | null;
+  account_types?: {
+    id: string;
+    name: string;
+    category: string;
+  } | null;
 }
 
 export default function Settings() {
@@ -68,12 +70,10 @@ export default function Settings() {
   const router = useRouter();
 
   // State for account management
-  const [expandedNodes, setExpandedNodes] = useState<string[]>([
-    "banking",
-    "investments",
-    "cash",
-  ]);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
+  const [accountTypes, setAccountTypes] = useState<AccountType[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Account form state - Updated to match database schema
   const [accountForm, setAccountForm] = useState({
@@ -85,192 +85,50 @@ export default function Settings() {
     initial_balance: "0",
   });
 
-  // Mock account types (these would come from the database)
-  const accountTypes: AccountType[] = [
-    { id: "1", name: "Bank Account", category: "DEBIT" },
-    { id: "2", name: "Cash", category: "DEBIT" },
-    { id: "3", name: "Credit Card", category: "CREDIT" },
-    { id: "4", name: "Investment Account", category: "DEBIT" },
-    { id: "5", name: "Fixed Deposit", category: "DEBIT" },
-    { id: "6", name: "Mutual Fund", category: "DEBIT" },
-    { id: "7", name: "Stock Portfolio", category: "DEBIT" },
-    { id: "8", name: "Real Estate", category: "DEBIT" },
-    { id: "9", name: "Vehicle", category: "DEBIT" },
-    { id: "10", name: "Loan", category: "CREDIT" },
-    { id: "11", name: "Digital Wallet", category: "DEBIT" },
-  ];
+  // Fetch data from database
+  const fetchAccountTypes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("account_types")
+        .select("*")
+        .order("name");
 
-  // Mock account tree data (this would come from the database)
-  const accountsTree: TreeNode[] = [
-    {
-      id: "banking",
-      name: "Banking",
-      icon: Building2,
-      children: [
-        {
-          id: "hdfc",
-          name: "HDFC Bank",
-          icon: Landmark,
-          children: [
-            {
-              id: "hdfc-savings",
-              name: "Savings Account",
-              icon: PiggyBank,
-              balance: 245000,
-              type: "account",
-            },
-            {
-              id: "hdfc-current",
-              name: "Current Account",
-              icon: Building2,
-              balance: 180000,
-              type: "account",
-            },
-            {
-              id: "hdfc-fd",
-              name: "Fixed Deposits",
-              icon: TrendingUp,
-              children: [
-                {
-                  id: "hdfc-fd-1yr",
-                  name: "1 Year FD",
-                  icon: TrendingUp,
-                  balance: 500000,
-                  type: "account",
-                },
-                {
-                  id: "hdfc-fd-3yr",
-                  name: "3 Year FD",
-                  icon: TrendingUp,
-                  balance: 300000,
-                  type: "account",
-                },
-              ],
-            },
-          ],
-        },
-        {
-          id: "sbi",
-          name: "State Bank of India",
-          icon: Landmark,
-          children: [
-            {
-              id: "sbi-savings",
-              name: "Savings Account",
-              icon: PiggyBank,
-              balance: 125000,
-              type: "account",
-            },
-          ],
-        },
-      ],
-    },
-    {
-      id: "credit-cards",
-      name: "Credit Cards",
-      icon: CreditCard,
-      children: [
-        {
-          id: "hdfc-cc",
-          name: "HDFC Regalia",
-          icon: CreditCard,
-          balance: -45000,
-          type: "account",
-        },
-        {
-          id: "sbi-cc",
-          name: "SBI SimplyCLICK",
-          icon: CreditCard,
-          balance: -28000,
-          type: "account",
-        },
-      ],
-    },
-    {
-      id: "investments",
-      name: "Investments",
-      icon: TrendingUp,
-      children: [
-        {
-          id: "stock-market",
-          name: "Stock Market",
-          icon: TrendingUp,
-          children: [
-            {
-              id: "zerodha",
-              name: "Zerodha Demat",
-              icon: TrendingUp,
-              children: [
-                {
-                  id: "zerodha-equity",
-                  name: "Equity Portfolio",
-                  icon: TrendingUp,
-                  balance: 450000,
-                  type: "account",
-                },
-                {
-                  id: "zerodha-intraday",
-                  name: "Intraday Trading",
-                  icon: TrendingUp,
-                  balance: 25000,
-                  type: "account",
-                },
-              ],
-            },
-          ],
-        },
-        {
-          id: "mutual-funds",
-          name: "Mutual Funds",
-          icon: PiggyBank,
-          children: [
-            {
-              id: "sip-equity",
-              name: "Equity SIP",
-              icon: TrendingUp,
-              balance: 325000,
-              type: "account",
-            },
-            {
-              id: "sip-debt",
-              name: "Debt SIP",
-              icon: PiggyBank,
-              balance: 150000,
-              type: "account",
-            },
-          ],
-        },
-      ],
-    },
-    {
-      id: "cash",
-      name: "Cash & Others",
-      icon: Wallet,
-      children: [
-        {
-          id: "cash-wallet",
-          name: "Physical Cash",
-          icon: Wallet,
-          balance: 15000,
-          type: "account",
-        },
-        {
-          id: "paytm",
-          name: "Paytm Wallet",
-          icon: Wallet,
-          balance: 2500,
-          type: "account",
-        },
-        {
-          id: "gpay",
-          name: "Google Pay",
-          icon: Wallet,
-          balance: 1200,
-          type: "account",
-        },
-      ],
-    },
-  ];
+      if (error) throw error;
+      setAccountTypes(data || []);
+    } catch (error) {
+      console.error("Error fetching account types:", error);
+    }
+  };
+
+  const fetchAccounts = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from("accounts")
+        .select(
+          `
+          *,
+          account_types (
+            id,
+            name,
+            category
+          )
+        `
+        )
+        .or(`user_id.eq.${user.id},user_id.is.null`)
+        .order("name");
+
+      if (error) throw error;
+      setAccounts(data || []);
+    } catch (error) {
+      console.error("Error fetching accounts:", error);
+    }
+  };
+
+  const loadData = async () => {
+    await Promise.all([fetchAccountTypes(), fetchAccounts()]);
+  };
 
   useEffect(() => {
     if (!user && loading) {
@@ -278,171 +136,51 @@ export default function Settings() {
     }
   }, [user, loading, initialize]);
 
-  // Function to format currency in Indian Rupees
-  const formatINR = (amount: number) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
+  useEffect(() => {
+    if (user) {
+      loadData();
+    }
+  }, [user]);
 
-  const toggleNode = (nodeId: string) => {
-    setExpandedNodes((prev) =>
-      prev.includes(nodeId)
-        ? prev.filter((id) => id !== nodeId)
-        : [...prev, nodeId]
-    );
-  };
+  const handleAccountSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
 
-  // Recursive tree component
-  const TreeNodeComponent = ({
-    node,
-    level = 0,
-  }: {
-    node: TreeNode;
-    level?: number;
-  }) => {
-    const isExpanded = expandedNodes.includes(node.id);
-    const hasChildren = node.children && node.children.length > 0;
-    const Icon = node.icon;
-
-    const indentationStyle = {
-      paddingLeft: `${level * 1 + 0.5}rem`,
-    };
-
-    return (
-      <div key={node.id}>
-        <div
-          style={indentationStyle}
-          className={`flex items-center w-full p-2 sm:p-3 text-left hover:bg-gray-50 rounded-lg transition-colors cursor-pointer ${
-            level > 0 ? "border-l border-gray-200 ml-1 sm:ml-2" : ""
-          } min-w-0`}
-          onClick={() => hasChildren && toggleNode(node.id)}
-        >
-          {hasChildren ? (
-            isExpanded ? (
-              <ChevronDown className="h-4 w-4 mr-2 text-gray-500 flex-shrink-0" />
-            ) : (
-              <ChevronRight className="h-4 w-4 mr-2 text-gray-500 flex-shrink-0" />
-            )
-          ) : (
-            <div className="w-4 h-4 mr-2"></div>
-          )}
-
-          <Icon
-            className={`mr-2 sm:mr-3 text-gray-600 flex-shrink-0 ${
-              level === 0
-                ? "h-4 w-4 sm:h-5 sm:w-5"
-                : level === 1
-                ? "h-3 w-3 sm:h-4 sm:w-4"
-                : "h-3 w-3"
-            }`}
-          />
-
-          <div className="flex-1 min-w-0">
-            <span
-              className={`font-medium text-gray-900 ${
-                level === 0
-                  ? "text-sm sm:text-base"
-                  : level === 1
-                  ? "text-xs sm:text-sm"
-                  : "text-xs"
-              }`}
-            >
-              {node.name}
-            </span>
-            {node.type && level > 1 && (
-              <p className="text-xs text-gray-500 capitalize truncate">
-                {node.type}
-              </p>
-            )}
-          </div>
-
-          {node.balance !== undefined && (
-            <span
-              className={`font-semibold flex-shrink-0 ml-1 sm:ml-2 text-right ${
-                level === 0 ? "text-xs sm:text-sm" : "text-xs"
-              } ${
-                node.balance >= 0 ? "text-green-600" : "text-red-600"
-              } min-w-0 truncate max-w-[80px] sm:max-w-none`}
-            >
-              {formatINR(Math.abs(node.balance))}
-            </span>
-          )}
-
-          {hasChildren && !node.balance && (
-            <span className="ml-auto text-xs text-gray-500 flex-shrink-0 min-w-0">
-              ({getTotalAccounts(node)})
-            </span>
-          )}
-        </div>
-
-        {hasChildren && isExpanded && (
-          <div className={level === 0 ? "mt-1 mb-3" : "mt-1"}>
-            {node.children!.map((child) => (
-              <TreeNodeComponent
-                key={child.id}
-                node={child}
-                level={level + 1}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  // Helper function to count total accounts in a tree
-  const getTotalAccounts = (node: TreeNode): number => {
-    if (!node.children) return node.type === "account" ? 1 : 0;
-    return node.children.reduce(
-      (total, child) => total + getTotalAccounts(child),
-      0
-    );
-  };
-
-  // Get flat list of accounts for parent selection
-  const getFlatAccountsList = (
-    nodes: TreeNode[],
-    prefix = ""
-  ): Array<{ id: string; name: string; level: number }> => {
-    const result: Array<{ id: string; name: string; level: number }> = [];
-
-    nodes.forEach((node) => {
-      const currentName = prefix ? `${prefix} > ${node.name}` : node.name;
-      const level = prefix.split(" > ").length - 1;
-
-      result.push({
-        id: node.id,
-        name: currentName,
-        level,
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase.from("accounts").insert({
+        user_id: user.id,
+        name: accountForm.name,
+        code: accountForm.code || null,
+        account_type_id: accountForm.account_type_id,
+        parent_id:
+          accountForm.parent_id === "none" ? null : accountForm.parent_id,
+        description: accountForm.description || null,
+        balance: parseFloat(accountForm.initial_balance) || 0,
+        is_active: true,
       });
 
-      if (node.children) {
-        result.push(...getFlatAccountsList(node.children, currentName));
-      }
-    });
+      if (error) throw error;
 
-    return result;
-  };
+      // Refresh accounts list
+      await fetchAccounts();
 
-  const flatAccountsList = getFlatAccountsList(accountsTree);
-
-  const handleAccountSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log("Account submitted:", accountForm);
-    // TODO: Add API call to create account in database
-    setIsAccountModalOpen(false);
-    setAccountForm({
-      name: "",
-      code: "",
-      account_type_id: "",
-      parent_id: "none",
-      description: "",
-      initial_balance: "0",
-    });
+      // Reset form and close modal
+      setAccountForm({
+        name: "",
+        code: "",
+        account_type_id: "",
+        parent_id: "none",
+        description: "",
+        initial_balance: "0",
+      });
+      setIsAccountModalOpen(false);
+    } catch (error) {
+      console.error("Error creating account:", error);
+      alert("Error creating account. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (loading) {
@@ -641,11 +379,48 @@ export default function Settings() {
                             <SelectItem value="none">
                               No Parent (Top Level)
                             </SelectItem>
-                            {flatAccountsList.map((account) => (
-                              <SelectItem key={account.id} value={account.id}>
-                                {"  ".repeat(account.level)}└ {account.name}
-                              </SelectItem>
-                            ))}
+
+                            {/* System Accounts */}
+                            {accounts.filter(
+                              (account) => account.user_id === null
+                            ).length > 0 && (
+                              <>
+                                <div className="px-2 py-1.5 text-xs font-medium text-gray-500 bg-gray-50">
+                                  System Accounts
+                                </div>
+                                {accounts
+                                  .filter((account) => account.user_id === null)
+                                  .map((account) => (
+                                    <SelectItem
+                                      key={account.id}
+                                      value={account.id}
+                                    >
+                                      📁 {account.name}
+                                    </SelectItem>
+                                  ))}
+                              </>
+                            )}
+
+                            {/* User Accounts */}
+                            {accounts.filter(
+                              (account) => account.user_id !== null
+                            ).length > 0 && (
+                              <>
+                                <div className="px-2 py-1.5 text-xs font-medium text-gray-500 bg-gray-50">
+                                  My Accounts
+                                </div>
+                                {accounts
+                                  .filter((account) => account.user_id !== null)
+                                  .map((account) => (
+                                    <SelectItem
+                                      key={account.id}
+                                      value={account.id}
+                                    >
+                                      💼 {account.name}
+                                    </SelectItem>
+                                  ))}
+                              </>
+                            )}
                           </SelectContent>
                         </Select>
                       </div>
@@ -671,21 +446,23 @@ export default function Settings() {
                           type="button"
                           variant="outline"
                           onClick={() => setIsAccountModalOpen(false)}
+                          disabled={isSubmitting}
                         >
                           Cancel
                         </Button>
-                        <Button type="submit">Create Account</Button>
+                        <Button type="submit" disabled={isSubmitting}>
+                          {isSubmitting ? "Creating..." : "Create Account"}
+                        </Button>
                       </div>
                     </form>
                   </DialogContent>
                 </Dialog>
               </CardHeader>
               <CardContent>
-                <div className="h-[calc(100vh-300px)] sm:h-[calc(100vh-400px)] overflow-y-auto overflow-x-hidden">
-                  {accountsTree.map((node) => (
-                    <TreeNodeComponent key={node.id} node={node} />
-                  ))}
-                </div>
+                <ChartOfAccounts
+                  showHeader={false}
+                  maxHeight="h-[calc(100vh-300px)] sm:h-[calc(100vh-400px)]"
+                />
               </CardContent>
             </Card>
           </TabsContent>

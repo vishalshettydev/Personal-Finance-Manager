@@ -53,17 +53,9 @@ interface TreeNode {
   children?: TreeNode[];
 }
 
-// Account Types from database schema
-interface AccountType {
-  id: string;
-  name: string;
-  category: "DEBIT" | "CREDIT";
-}
-
 export default function Dashboard() {
   const { user, loading, initialize } = useAuthStore();
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
-  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [expandedNodes, setExpandedNodes] = useState<string[]>([
     "banking",
     "banking.hdfc",
@@ -80,31 +72,6 @@ export default function Dashboard() {
     description: "",
     date: new Date().toISOString().split("T")[0],
   });
-
-  // Account form state - Updated to match database schema
-  const [accountForm, setAccountForm] = useState({
-    name: "",
-    code: "",
-    account_type_id: "",
-    parent_id: "none",
-    description: "",
-    initial_balance: "0",
-  });
-
-  // Mock account types (these would come from the database)
-  const accountTypes: AccountType[] = [
-    { id: "1", name: "Bank Account", category: "DEBIT" },
-    { id: "2", name: "Cash", category: "DEBIT" },
-    { id: "3", name: "Credit Card", category: "CREDIT" },
-    { id: "4", name: "Investment Account", category: "DEBIT" },
-    { id: "5", name: "Fixed Deposit", category: "DEBIT" },
-    { id: "6", name: "Mutual Fund", category: "DEBIT" },
-    { id: "7", name: "Stock Portfolio", category: "DEBIT" },
-    { id: "8", name: "Real Estate", category: "DEBIT" },
-    { id: "9", name: "Vehicle", category: "DEBIT" },
-    { id: "10", name: "Loan", category: "CREDIT" },
-    { id: "11", name: "Digital Wallet", category: "DEBIT" },
-  ];
 
   useEffect(() => {
     if (!user && loading) {
@@ -227,31 +194,6 @@ export default function Dashboard() {
     );
   };
 
-  // Get flat list of accounts for parent selection
-  const getFlatAccountsList = (
-    nodes: TreeNode[],
-    prefix = ""
-  ): Array<{ id: string; name: string; level: number }> => {
-    const result: Array<{ id: string; name: string; level: number }> = [];
-
-    nodes.forEach((node) => {
-      const currentName = prefix ? `${prefix} > ${node.name}` : node.name;
-      const level = prefix.split(" > ").length - 1;
-
-      result.push({
-        id: node.id,
-        name: currentName,
-        level,
-      });
-
-      if (node.children) {
-        result.push(...getFlatAccountsList(node.children, currentName));
-      }
-    });
-
-    return result;
-  };
-
   const handleTransactionSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     console.log("Transaction submitted:", transactionForm);
@@ -263,22 +205,6 @@ export default function Dashboard() {
       account: "",
       description: "",
       date: new Date().toISOString().split("T")[0],
-    });
-  };
-
-  const handleAccountSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log("Account submitted:", accountForm);
-    // TODO: Add API call to create account in database
-    // This would insert into the 'accounts' table with proper parent_id and account_type_id
-    setIsAccountModalOpen(false);
-    setAccountForm({
-      name: "",
-      code: "",
-      account_type_id: "",
-      parent_id: "none",
-      description: "",
-      initial_balance: "0",
     });
   };
 
@@ -590,8 +516,6 @@ export default function Dashboard() {
     },
   ];
 
-  const flatAccountsList = getFlatAccountsList(accountsTreeData);
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -799,172 +723,6 @@ export default function Dashboard() {
                 </form>
               </DialogContent>
             </Dialog>
-
-            <Dialog
-              open={isAccountModalOpen}
-              onOpenChange={setIsAccountModalOpen}
-            >
-              <DialogTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="flex items-center space-x-2"
-                >
-                  <Landmark className="h-4 w-4" />
-                  <span>Add Account</span>
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[500px]">
-                <DialogHeader>
-                  <DialogTitle>Add New Account</DialogTitle>
-                  <DialogDescription>
-                    Create a new account in your chart of accounts. This follows
-                    double-entry accounting principles.
-                  </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={handleAccountSubmit} className="space-y-4">
-                  <div className="bg-amber-50 p-3 rounded-lg">
-                    <div className="flex items-center">
-                      <AlertCircle className="h-4 w-4 text-amber-600 mr-2" />
-                      <p className="text-sm text-amber-700">
-                        Set up your chart of accounts before recording
-                        transactions. You can create nested account hierarchies.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="accountName">Account Name *</Label>
-                      <Input
-                        id="accountName"
-                        placeholder="e.g., HDFC Primary Savings"
-                        value={accountForm.name}
-                        onChange={(e) =>
-                          setAccountForm({
-                            ...accountForm,
-                            name: e.target.value,
-                          })
-                        }
-                        required
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="accountCode">Account Code</Label>
-                      <Input
-                        id="accountCode"
-                        placeholder="e.g., 1001"
-                        value={accountForm.code}
-                        onChange={(e) =>
-                          setAccountForm({
-                            ...accountForm,
-                            code: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="accountType">Account Type *</Label>
-                    <Select
-                      value={accountForm.account_type_id}
-                      onValueChange={(value) =>
-                        setAccountForm({
-                          ...accountForm,
-                          account_type_id: value,
-                        })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select account type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {accountTypes.map((type) => (
-                          <SelectItem key={type.id} value={type.id}>
-                            {type.name} ({type.category})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="parentAccount">
-                      Parent Account (Optional)
-                    </Label>
-                    <Select
-                      value={accountForm.parent_id}
-                      onValueChange={(value) =>
-                        setAccountForm({
-                          ...accountForm,
-                          parent_id: value === "none" ? "" : value,
-                        })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select parent account for hierarchy" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">
-                          No Parent (Top Level)
-                        </SelectItem>
-                        {flatAccountsList.map((account) => (
-                          <SelectItem key={account.id} value={account.id}>
-                            {"  ".repeat(account.level)}└ {account.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="initialBalance">Initial Balance (₹)</Label>
-                    <Input
-                      id="initialBalance"
-                      type="number"
-                      placeholder="0"
-                      value={accountForm.initial_balance}
-                      onChange={(e) =>
-                        setAccountForm({
-                          ...accountForm,
-                          initial_balance: e.target.value,
-                        })
-                      }
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      For DEBIT accounts: positive = asset/expense. For CREDIT
-                      accounts: positive = liability/income.
-                    </p>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="accountDescription">Description</Label>
-                    <Textarea
-                      id="accountDescription"
-                      placeholder="Account description and purpose..."
-                      value={accountForm.description}
-                      onChange={(e) =>
-                        setAccountForm({
-                          ...accountForm,
-                          description: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-
-                  <div className="flex justify-end space-x-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setIsAccountModalOpen(false)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button type="submit">Create Account</Button>
-                  </div>
-                </form>
-              </DialogContent>
-            </Dialog>
           </div>
         </div>
 
@@ -1110,13 +868,9 @@ export default function Dashboard() {
                     <p className="text-gray-500 mb-4">
                       No accounts created yet
                     </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setIsAccountModalOpen(true)}
-                    >
-                      Create Your First Account
-                    </Button>
+                    <p className="text-sm text-gray-400">
+                      Go to Settings → Accounts to create your first account
+                    </p>
                   </div>
                 ) : (
                   accountsTreeData.map((node) => (

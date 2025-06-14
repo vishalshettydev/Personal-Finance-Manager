@@ -14,6 +14,7 @@ import {
   ChevronRight,
   Expand,
   Minimize2,
+  Edit3,
 } from "lucide-react";
 
 // Types
@@ -54,6 +55,7 @@ interface ChartOfAccountsProps {
   className?: string;
   maxHeight?: string;
   refreshTrigger?: number; // Optional prop to trigger refresh
+  onEditAccount?: (account: Account) => void; // Optional callback for editing accounts
 }
 
 export default function ChartOfAccounts({
@@ -61,6 +63,7 @@ export default function ChartOfAccounts({
   className = "",
   maxHeight = "h-[calc(100vh-300px)] sm:h-[calc(100vh-400px)]",
   refreshTrigger,
+  onEditAccount,
 }: ChartOfAccountsProps) {
   const { user } = useAuthStore();
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -272,7 +275,7 @@ export default function ChartOfAccounts({
       <div key={node.id}>
         <div
           style={indentationStyle}
-          className={`flex items-center w-full p-2 sm:p-3 text-left hover:bg-gray-50 rounded-lg transition-colors cursor-pointer ${
+          className={`group flex items-center w-full p-2 sm:p-3 text-left hover:bg-gray-50 rounded-lg transition-colors cursor-pointer ${
             level > 0 ? "border-l border-gray-200 ml-1 sm:ml-2" : ""
           } min-w-0 ${isSystemAccount ? "bg-blue-50/30" : ""}`}
           onClick={() => hasChildren && toggleNode(node.id)}
@@ -352,6 +355,24 @@ export default function ChartOfAccounts({
             <span className="ml-auto text-xs font-medium text-blue-600 flex-shrink-0 min-w-0">
               {formatINR(getTotalBalance(node))}
             </span>
+          )}
+
+          {/* Edit button - only show for user accounts and when onEditAccount is provided */}
+          {onEditAccount && !isSystemAccount && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                // Find the original account data
+                const account = accounts.find((acc) => acc.id === node.id);
+                if (account) {
+                  onEditAccount(account);
+                }
+              }}
+              className="ml-2 p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-all duration-200 flex-shrink-0 opacity-0 group-hover:opacity-100"
+              title="Edit Account"
+            >
+              <Edit3 className="h-3.5 w-3.5" />
+            </button>
           )}
         </div>
 

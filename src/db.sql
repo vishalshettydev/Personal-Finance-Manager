@@ -40,6 +40,7 @@ CREATE TABLE public.accounts (
   name VARCHAR NOT NULL,
   code VARCHAR,
   description TEXT,
+  is_placeholder BOOLEAN DEFAULT false,
   is_active BOOLEAN DEFAULT true,
   balance NUMERIC DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT now(),
@@ -47,16 +48,16 @@ CREATE TABLE public.accounts (
 );
 
 -- Insert default top-level accounts
-INSERT INTO public.accounts (user_id, name, account_type_id)
-SELECT NULL::uuid, 'Assets', id FROM public.account_types WHERE name = 'Asset'
+INSERT INTO public.accounts (user_id, name, account_type_id, is_placeholder)
+SELECT NULL::uuid, 'Assets', id, true FROM public.account_types WHERE name = 'Asset'
 UNION ALL
-SELECT NULL::uuid, 'Liabilities', id FROM public.account_types WHERE name = 'Liability'
+SELECT NULL::uuid, 'Liabilities', id, true FROM public.account_types WHERE name = 'Liability'
 UNION ALL
-SELECT NULL::uuid, 'Equity', id FROM public.account_types WHERE name = 'Equity'
+SELECT NULL::uuid, 'Equity', id, true FROM public.account_types WHERE name = 'Equity'
 UNION ALL
-SELECT NULL::uuid, 'Income', id FROM public.account_types WHERE name = 'Income'
+SELECT NULL::uuid, 'Income', id, true FROM public.account_types WHERE name = 'Income'
 UNION ALL
-SELECT NULL::uuid, 'Expenses', id FROM public.account_types WHERE name = 'Expense';
+SELECT NULL::uuid, 'Expenses', id, true FROM public.account_types WHERE name = 'Expense';
 
 -- ========================
 -- TRANSACTIONS (Double Entry System)

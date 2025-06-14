@@ -25,6 +25,7 @@ interface TreeNode {
   type?: string;
   account_type?: string;
   user_id?: string | null;
+  is_placeholder?: boolean | null;
   children?: TreeNode[];
 }
 
@@ -36,6 +37,7 @@ interface Account {
   name: string;
   code?: string | null;
   description?: string | null;
+  is_placeholder?: boolean | null;
   is_active: boolean | null;
   balance: number | null;
   created_at: string | null;
@@ -142,6 +144,7 @@ export default function ChartOfAccounts({
         type: account.account_types?.name || "Unknown",
         account_type: account.account_types?.category || "Unknown",
         user_id: account.user_id,
+        is_placeholder: account.is_placeholder,
         children: [],
       };
       accountMap.set(account.id, node);
@@ -329,6 +332,11 @@ export default function ChartOfAccounts({
               {isSystemAccount && (
                 <span className="text-xs text-blue-600">System</span>
               )}
+              {node.is_placeholder && (
+                <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded">
+                  Placeholder
+                </span>
+              )}
               {node.type && (
                 <span
                   className={`text-xs px-2 py-0.5 rounded ${
@@ -343,17 +351,19 @@ export default function ChartOfAccounts({
             </div>
           </div>
 
-          {node.balance !== undefined && !hasChildren && (
-            <span
-              className={`font-semibold flex-shrink-0 ml-1 sm:ml-2 text-right ${
-                level === 0 ? "text-xs sm:text-sm" : "text-xs"
-              } ${
-                node.balance >= 0 ? "text-green-600" : "text-red-600"
-              } min-w-0 truncate max-w-[80px] sm:max-w-none`}
-            >
-              {formatINR(Math.abs(node.balance))}
-            </span>
-          )}
+          {node.balance !== undefined &&
+            !hasChildren &&
+            !node.is_placeholder && (
+              <span
+                className={`font-semibold flex-shrink-0 ml-1 sm:ml-2 text-right ${
+                  level === 0 ? "text-xs sm:text-sm" : "text-xs"
+                } ${
+                  node.balance >= 0 ? "text-green-600" : "text-red-600"
+                } min-w-0 truncate max-w-[80px] sm:max-w-none`}
+              >
+                {formatINR(Math.abs(node.balance))}
+              </span>
+            )}
 
           {hasChildren && (
             <span className="ml-auto text-xs text-gray-500 flex-shrink-0 min-w-0">

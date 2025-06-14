@@ -54,6 +54,7 @@ interface Account {
   name: string;
   code?: string | null;
   description?: string | null;
+  is_placeholder?: boolean | null;
   is_active: boolean | null;
   balance: number | null;
   created_at: string | null;
@@ -78,6 +79,7 @@ export default function Settings() {
   const [accountTypes, setAccountTypes] = useState<AccountType[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Account form state - Updated to match database schema
   const [accountForm, setAccountForm] = useState({
@@ -87,6 +89,7 @@ export default function Settings() {
     parent_id: "none",
     description: "",
     initial_balance: "0",
+    is_placeholder: false,
   });
 
   // Fetch data from database
@@ -258,7 +261,10 @@ export default function Settings() {
             ? null
             : accountForm.parent_id,
         description: accountForm.description || null,
-        balance: parseFloat(accountForm.initial_balance) || 0,
+        balance: accountForm.is_placeholder
+          ? 0
+          : parseFloat(accountForm.initial_balance) || 0,
+        is_placeholder: accountForm.is_placeholder,
         is_active: true,
       });
 
@@ -266,6 +272,9 @@ export default function Settings() {
 
       // Refresh accounts list
       await fetchAccounts();
+
+      // Trigger Chart of Accounts refresh
+      setRefreshTrigger((prev) => prev + 1);
 
       // Reset form and close modal
       setAccountForm({
@@ -275,6 +284,7 @@ export default function Settings() {
         parent_id: "",
         description: "",
         initial_balance: "0",
+        is_placeholder: false,
       });
       setIsAccountModalOpen(false);
     } catch (error) {
@@ -449,7 +459,11 @@ export default function Settings() {
                             id="initialBalance"
                             type="number"
                             step="0.01"
-                            value={accountForm.initial_balance}
+                            value={
+                              accountForm.is_placeholder
+                                ? "0"
+                                : accountForm.initial_balance
+                            }
                             onChange={(e) =>
                               setAccountForm({
                                 ...accountForm,
@@ -457,7 +471,13 @@ export default function Settings() {
                               })
                             }
                             placeholder="0.00"
+                            disabled={accountForm.is_placeholder}
                           />
+                          {accountForm.is_placeholder && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              Placeholder accounts cannot have balances
+                            </p>
+                          )}
                         </div>
                       </div>
 
@@ -524,6 +544,33 @@ export default function Settings() {
                         />
                       </div>
 
+                      <div className="flex items-start space-x-3">
+                        <input
+                          type="checkbox"
+                          id="isPlaceholder"
+                          checked={accountForm.is_placeholder}
+                          onChange={(e) =>
+                            setAccountForm({
+                              ...accountForm,
+                              is_placeholder: e.target.checked,
+                            })
+                          }
+                          className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                        <div className="grid gap-1.5 leading-none">
+                          <Label
+                            htmlFor="isPlaceholder"
+                            className="text-sm font-medium leading-none cursor-pointer"
+                          >
+                            Placeholder Account
+                          </Label>
+                          <p className="text-xs text-gray-500">
+                            This account is used for organization only and
+                            cannot hold transactions
+                          </p>
+                        </div>
+                      </div>
+
                       <div className="flex justify-end space-x-2 pt-4">
                         <Button
                           type="button"
@@ -545,6 +592,7 @@ export default function Settings() {
                 <ChartOfAccounts
                   showHeader={false}
                   maxHeight="h-[calc(100vh-300px)] sm:h-[calc(100vh-400px)]"
+                  refreshTrigger={refreshTrigger}
                 />
               </CardContent>
             </Card>

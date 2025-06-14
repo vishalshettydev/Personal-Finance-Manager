@@ -65,6 +65,10 @@ interface Account {
   } | null;
 }
 
+interface HierarchicalAccount extends Account {
+  children: HierarchicalAccount[];
+}
+
 export default function Settings() {
   const { user, loading, initialize } = useAuthStore();
   const router = useRouter();
@@ -130,6 +134,102 @@ export default function Settings() {
     await Promise.all([fetchAccountTypes(), fetchAccounts()]);
   };
 
+  // Build hierarchical account structure for parent selection
+  const buildAccountHierarchy = (
+    accounts: Account[]
+  ): HierarchicalAccount[] => {
+    const accountMap = new Map<string, HierarchicalAccount>();
+    const rootAccounts: HierarchicalAccount[] = [];
+
+    // First pass: create all nodes with children array
+    accounts.forEach((account) => {
+      accountMap.set(account.id, { ...account, children: [] });
+    });
+
+    // Second pass: build hierarchy
+    accounts.forEach((account) => {
+      const node = accountMap.get(account.id);
+      if (!node) return;
+
+      if (account.parent_id && accountMap.has(account.parent_id)) {
+        const parent = accountMap.get(account.parent_id);
+        if (parent) {
+          parent.children.push(node);
+        }
+      } else {
+        rootAccounts.push(node);
+      }
+    });
+
+    // Sort at each level
+    const sortAccounts = (accountList: HierarchicalAccount[]) => {
+      accountList.sort((a, b) => a.name.localeCompare(b.name));
+      accountList.forEach((account) => {
+        if (account.children.length > 0) {
+          sortAccounts(account.children);
+        }
+      });
+    };
+
+    sortAccounts(rootAccounts);
+    return rootAccounts;
+  };
+
+  // Render hierarchical account options
+  const renderAccountOptions = (
+    accountList: HierarchicalAccount[],
+    level: number = 0
+  ): React.ReactElement[] => {
+    const options: React.ReactElement[] = [];
+
+    accountList.forEach((account) => {
+      const isSystemAccount = account.user_id === null;
+      const icon = isSystemAccount ? "📁" : "💼";
+
+      // Create visual hierarchy with proper indentation
+      const indentLevel = level * 20; // 20px per level
+      const treeLines = level > 0 ? "├── " : "";
+
+      options.push(
+        <SelectItem key={account.id} value={account.id}>
+          <div
+            className="flex items-center w-full"
+            style={{ paddingLeft: `${indentLevel}px` }}
+          >
+            <span className="text-gray-400 font-mono text-xs mr-1">
+              {treeLines}
+            </span>
+            <span className="mr-2">{icon}</span>
+            <span
+              className={`font-medium ${
+                isSystemAccount ? "text-blue-700" : "text-gray-900"
+              }`}
+            >
+              {account.name}
+            </span>
+            {account.account_types && (
+              <span className="text-xs text-gray-500 ml-2">
+                ({account.account_types.name})
+              </span>
+            )}
+            {isSystemAccount && (
+              <span className="text-xs bg-blue-100 text-blue-700 px-1 py-0.5 rounded ml-2">
+                System
+              </span>
+            )}
+          </div>
+        </SelectItem>
+      );
+
+      // Add children recursively
+      if (account.children.length > 0) {
+        options.push(...renderAccountOptions(account.children, level + 1));
+      }
+    });
+
+    return options;
+  };
+
   useEffect(() => {
     if (!user && loading) {
       initialize();
@@ -154,7 +254,9 @@ export default function Settings() {
         code: accountForm.code || null,
         account_type_id: accountForm.account_type_id,
         parent_id:
-          accountForm.parent_id === "none" ? null : accountForm.parent_id,
+          !accountForm.parent_id || accountForm.parent_id === "none"
+            ? null
+            : accountForm.parent_id,
         description: accountForm.description || null,
         balance: parseFloat(accountForm.initial_balance) || 0,
         is_active: true,
@@ -170,7 +272,7 @@ export default function Settings() {
         name: "",
         code: "",
         account_type_id: "",
-        parent_id: "none",
+        parent_id: "",
         description: "",
         initial_balance: "0",
       });
@@ -364,7 +466,7 @@ export default function Settings() {
                           Parent Account (Optional)
                         </Label>
                         <Select
-                          value={accountForm.parent_id}
+                          value={accountForm.parent_id || "none"}
                           onValueChange={(value) =>
                             setAccountForm({
                               ...accountForm,
@@ -375,52 +477,33 @@ export default function Settings() {
                           <SelectTrigger>
                             <SelectValue placeholder="Select parent account for hierarchy" />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent className="max-h-[300px]">
                             <SelectItem value="none">
-                              No Parent (Top Level)
+                              <span className="font-mono text-sm">
+                                🏠 No Parent (Top Level)
+                              </span>
                             </SelectItem>
 
-                            {/* System Accounts */}
-                            {accounts.filter(
-                              (account) => account.user_id === null
-                            ).length > 0 && (
-                              <>
-                                <div className="px-2 py-1.5 text-xs font-medium text-gray-500 bg-gray-50">
-                                  System Accounts
-                                </div>
-                                {accounts
-                                  .filter((account) => account.user_id === null)
-                                  .map((account) => (
-                                    <SelectItem
-                                      key={account.id}
-                                      value={account.id}
-                                    >
-                                      📁 {account.name}
-                                    </SelectItem>
-                                  ))}
-                              </>
-                            )}
+                            {/* Hierarchical Account Structure */}
+                            {(() => {
+                              const hierarchicalAccounts =
+                                buildAccountHierarchy(accounts);
 
-                            {/* User Accounts */}
-                            {accounts.filter(
-                              (account) => account.user_id !== null
-                            ).length > 0 && (
-                              <>
-                                <div className="px-2 py-1.5 text-xs font-medium text-gray-500 bg-gray-50">
-                                  My Accounts
-                                </div>
-                                {accounts
-                                  .filter((account) => account.user_id !== null)
-                                  .map((account) => (
-                                    <SelectItem
-                                      key={account.id}
-                                      value={account.id}
-                                    >
-                                      💼 {account.name}
-                                    </SelectItem>
-                                  ))}
-                              </>
-                            )}
+                              return (
+                                <>
+                                  {hierarchicalAccounts.length > 0 && (
+                                    <>
+                                      <div className="px-2 py-1.5 text-xs font-medium text-gray-500 bg-gray-50">
+                                        All Accounts (Hierarchical)
+                                      </div>
+                                      {renderAccountOptions(
+                                        hierarchicalAccounts
+                                      )}
+                                    </>
+                                  )}
+                                </>
+                              );
+                            })()}
                           </SelectContent>
                         </Select>
                       </div>

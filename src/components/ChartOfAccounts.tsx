@@ -51,12 +51,14 @@ interface ChartOfAccountsProps {
   showHeader?: boolean;
   className?: string;
   maxHeight?: string;
+  refreshTrigger?: number; // Optional prop to trigger refresh
 }
 
 export default function ChartOfAccounts({
   showHeader = true,
   className = "",
   maxHeight = "h-[calc(100vh-300px)] sm:h-[calc(100vh-400px)]",
+  refreshTrigger,
 }: ChartOfAccountsProps) {
   const { user } = useAuthStore();
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -185,7 +187,7 @@ export default function ChartOfAccounts({
       };
       loadData();
     }
-  }, [user]);
+  }, [user, refreshTrigger]); // Add refreshTrigger to dependencies
 
   // Build tree when accounts change
   useEffect(() => {
@@ -193,9 +195,30 @@ export default function ChartOfAccounts({
       const tree = buildAccountTree(accounts);
       setAccountsTree(tree);
 
-      // Auto-expand root level nodes
-      const rootIds = tree.map((node) => node.id);
-      setExpandedNodes(rootIds);
+      // Auto-expand first two levels to show more hierarchy by default
+      const getExpandableIds = (
+        nodes: TreeNode[],
+        maxLevel: number,
+        currentLevel: number = 0
+      ): string[] => {
+        const ids: string[] = [];
+        if (currentLevel >= maxLevel) return ids;
+
+        nodes.forEach((node) => {
+          if (node.children && node.children.length > 0) {
+            ids.push(node.id);
+            if (currentLevel < maxLevel - 1) {
+              ids.push(
+                ...getExpandableIds(node.children, maxLevel, currentLevel + 1)
+              );
+            }
+          }
+        });
+        return ids;
+      };
+
+      const expandIds = getExpandableIds(tree, 2); // Expand first 2 levels
+      setExpandedNodes(expandIds);
     }
   }, [accounts]);
 

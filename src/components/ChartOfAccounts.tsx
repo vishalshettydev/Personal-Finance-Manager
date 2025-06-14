@@ -268,84 +268,51 @@ export default function ChartOfAccounts({
     const isSystemAccount = node.user_id === null;
 
     const indentationStyle = {
-      paddingLeft: `${level * 1 + 0.5}rem`,
+      paddingLeft: `${level * 0.75 + 0.25}rem`,
     };
 
     return (
       <div key={node.id}>
         <div
           style={indentationStyle}
-          className={`group flex items-center w-full p-2 sm:p-3 text-left hover:bg-gray-50 rounded-lg transition-colors cursor-pointer ${
-            level > 0 ? "border-l border-gray-200 ml-1 sm:ml-2" : ""
-          } min-w-0 ${isSystemAccount ? "bg-blue-50/30" : ""}`}
+          className={`group flex items-center w-full py-1 px-2 text-left hover:bg-gray-50 transition-colors cursor-pointer ${
+            level > 0 ? "border-l border-gray-200 ml-1" : ""
+          } min-w-0`}
           onClick={() => hasChildren && toggleNode(node.id)}
         >
           {hasChildren ? (
             isExpanded ? (
-              <ChevronDown className="h-4 w-4 mr-2 text-gray-500 flex-shrink-0" />
+              <ChevronDown className="h-3 w-3 mr-1.5 text-gray-500 flex-shrink-0" />
             ) : (
-              <ChevronRight className="h-4 w-4 mr-2 text-gray-500 flex-shrink-0" />
+              <ChevronRight className="h-3 w-3 mr-1.5 text-gray-500 flex-shrink-0" />
             )
           ) : (
-            <div className="w-4 h-4 mr-2"></div>
+            <div className="w-3 h-3 mr-1.5"></div>
           )}
 
           <Icon
-            className={`mr-2 sm:mr-3 flex-shrink-0 ${
+            className={`mr-2 flex-shrink-0 ${
               isSystemAccount ? "text-blue-600" : "text-gray-600"
-            } ${
-              level === 0
-                ? "h-4 w-4 sm:h-5 sm:w-5"
-                : level === 1
-                ? "h-3 w-3 sm:h-4 sm:w-4"
-                : "h-3 w-3"
-            }`}
+            } h-3.5 w-3.5`}
           />
 
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 flex items-center">
             <span
-              className={`font-medium text-gray-900 ${
-                level === 0
-                  ? "text-sm sm:text-base"
-                  : level === 1
-                  ? "text-xs sm:text-sm"
-                  : "text-xs"
+              className={`font-medium text-gray-900 text-sm truncate ${
+                isSystemAccount ? "text-blue-900" : ""
               }`}
             >
               {node.name}
             </span>
-            <div className="flex items-center gap-2 mt-1">
-              {isSystemAccount && (
-                <span className="text-xs text-blue-600">System</span>
-              )}
-              {node.is_placeholder && (
-                <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded">
-                  Placeholder
-                </span>
-              )}
-              {node.type && (
-                <span
-                  className={`text-xs px-2 py-0.5 rounded ${
-                    isSystemAccount
-                      ? "bg-blue-100 text-blue-700"
-                      : "bg-gray-100 text-gray-700"
-                  }`}
-                >
-                  {node.type}
-                </span>
-              )}
-            </div>
           </div>
 
           {node.balance !== undefined &&
             !hasChildren &&
             !node.is_placeholder && (
               <span
-                className={`font-semibold flex-shrink-0 ml-1 sm:ml-2 text-right ${
-                  level === 0 ? "text-xs sm:text-sm" : "text-xs"
-                } ${
+                className={`font-semibold flex-shrink-0 ml-2 text-right text-xs ${
                   node.balance >= 0 ? "text-green-600" : "text-red-600"
-                } min-w-0 truncate max-w-[80px] sm:max-w-none`}
+                } min-w-0 truncate max-w-[100px]`}
               >
                 {formatINR(Math.abs(node.balance))}
               </span>
@@ -368,16 +335,16 @@ export default function ChartOfAccounts({
                   onEditAccount(account);
                 }
               }}
-              className="ml-2 p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-all duration-200 flex-shrink-0 opacity-0 group-hover:opacity-100"
+              className="ml-1.5 p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-all duration-200 flex-shrink-0 opacity-0 group-hover:opacity-100"
               title="Edit Account"
             >
-              <Edit3 className="h-3.5 w-3.5" />
+              <Edit3 className="h-3 w-3" />
             </button>
           )}
         </div>
 
         {hasChildren && isExpanded && (
-          <div className={level === 0 ? "mt-1 mb-3" : "mt-1"}>
+          <div className={level === 0 ? "mt-0.5 mb-1" : "mt-0.5"}>
             {node.children!.map((child) => (
               <TreeNodeComponent
                 key={child.id}
@@ -472,7 +439,7 @@ export default function ChartOfAccounts({
             </p>
           </div>
         ) : (
-          <div className="space-y-1">
+          <div className="space-y-0.5">
             {accountsTree.map((node) => (
               <TreeNodeComponent key={node.id} node={node} />
             ))}

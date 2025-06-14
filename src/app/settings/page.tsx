@@ -45,6 +45,7 @@ import {
   Trash2,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
 } from "lucide-react";
 
 // Types
@@ -103,6 +104,9 @@ export default function Settings() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [hasTransactions, setHasTransactions] = useState(false);
+  const [expandedParentAccounts, setExpandedParentAccounts] = useState<
+    Set<string>
+  >(new Set());
 
   // State for tag management
   const [tags, setTags] = useState<Tag[]>([]);
@@ -264,6 +268,17 @@ export default function Settings() {
 
     sortAccounts(rootAccounts);
     return rootAccounts;
+  };
+
+  // Toggle expand/collapse for parent account trees
+  const toggleParentAccountExpand = (accountId: string) => {
+    const newExpanded = new Set(expandedParentAccounts);
+    if (newExpanded.has(accountId)) {
+      newExpanded.delete(accountId);
+    } else {
+      newExpanded.add(accountId);
+    }
+    setExpandedParentAccounts(newExpanded);
   };
 
   // Render hierarchical account options
@@ -786,56 +801,140 @@ export default function Settings() {
                           Account Hierarchy
                         </h3>
 
-                        <div className="space-y-2">
-                          <Label
-                            htmlFor="parentAccount"
-                            className="text-sm font-medium"
-                          >
+                        <div className="space-y-3">
+                          <Label className="text-sm font-medium">
                             Parent Account
                           </Label>
-                          <Select
-                            value={accountForm.parent_id || "none"}
-                            onValueChange={(value) =>
-                              setAccountForm({
-                                ...accountForm,
-                                parent_id: value === "none" ? "" : value,
-                              })
-                            }
-                          >
-                            <SelectTrigger className="h-10">
-                              <SelectValue placeholder="Select parent account for hierarchy" />
-                            </SelectTrigger>
-                            <SelectContent className="max-h-[300px]">
-                              <SelectItem value="none">
-                                <div className="flex items-center gap-2 py-1">
-                                  <span className="text-lg">🏠</span>
-                                  <span className="font-medium">
-                                    No Parent (Top Level)
+                          <div className="border rounded-lg p-2 bg-gray-50 max-h-64 overflow-y-auto">
+                            <div className="space-y-0.5">
+                              {/* No Parent Option */}
+                              <div
+                                className={`flex items-center py-1 px-1 rounded text-sm transition-colors cursor-pointer ${
+                                  !accountForm.parent_id ||
+                                  accountForm.parent_id === "none"
+                                    ? "bg-blue-100 border border-blue-300"
+                                    : "hover:bg-gray-100"
+                                }`}
+                                onClick={() =>
+                                  setAccountForm({
+                                    ...accountForm,
+                                    parent_id: "",
+                                  })
+                                }
+                              >
+                                <span className="w-4 mr-1"></span>
+                                <span
+                                  className={`flex-1 ${
+                                    !accountForm.parent_id ||
+                                    accountForm.parent_id === "none"
+                                      ? "text-blue-700 font-medium"
+                                      : "text-gray-900"
+                                  }`}
+                                >
+                                  No Parent (Top Level)
+                                </span>
+                                {(!accountForm.parent_id ||
+                                  accountForm.parent_id === "none") && (
+                                  <span className="text-blue-600 text-xs">
+                                    ✓
                                   </span>
-                                </div>
-                              </SelectItem>
+                                )}
+                              </div>
 
-                              {/* Hierarchical Account Structure */}
                               {(() => {
                                 const hierarchicalAccounts =
                                   buildAccountHierarchy(accounts);
-                                return (
-                                  <>
-                                    {hierarchicalAccounts.length > 0 && (
-                                      <>
-                                        <div className="px-3 py-2 text-xs font-medium text-gray-500 bg-gray-50 border-t">
-                                          Available Parent Accounts
-                                        </div>
-                                        {renderAccountOptions(
-                                          hierarchicalAccounts
+
+                                const renderAccountTree = (
+                                  account: HierarchicalAccount,
+                                  level: number = 0
+                                ): React.ReactElement => {
+                                  const isSelected =
+                                    accountForm.parent_id === account.id;
+                                  const canSelect = true; // All accounts can be parents when creating
+                                  const isExpanded = expandedParentAccounts.has(
+                                    account.id
+                                  );
+                                  const hasChildren =
+                                    account.children.length > 0;
+
+                                  return (
+                                    <div key={account.id}>
+                                      <div
+                                        className={`flex items-center py-1 px-1 rounded text-sm transition-colors ${
+                                          isSelected
+                                            ? "bg-blue-100 border border-blue-300"
+                                            : canSelect
+                                            ? "hover:bg-gray-100 cursor-pointer"
+                                            : "cursor-default"
+                                        }`}
+                                        style={{
+                                          paddingLeft: `${4 + level * 16}px`,
+                                        }}
+                                      >
+                                        {hasChildren && (
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              toggleParentAccountExpand(
+                                                account.id
+                                              );
+                                            }}
+                                            className="mr-1 p-0.5 hover:bg-gray-200 rounded"
+                                          >
+                                            {isExpanded ? (
+                                              <ChevronDown className="h-3 w-3" />
+                                            ) : (
+                                              <ChevronRight className="h-3 w-3" />
+                                            )}
+                                          </button>
                                         )}
-                                      </>
-                                    )}
-                                  </>
+                                        {!hasChildren && (
+                                          <span className="w-4 mr-1"></span>
+                                        )}
+                                        <span
+                                          className={`flex-1 ${
+                                            account.is_placeholder
+                                              ? "text-gray-600 font-medium"
+                                              : isSelected
+                                              ? "text-blue-700 font-medium"
+                                              : "text-gray-900"
+                                          }`}
+                                          onClick={() => {
+                                            if (canSelect) {
+                                              setAccountForm({
+                                                ...accountForm,
+                                                parent_id: account.id,
+                                              });
+                                            }
+                                          }}
+                                        >
+                                          {account.name}
+                                        </span>
+                                        {isSelected && (
+                                          <span className="text-blue-600 text-xs">
+                                            ✓
+                                          </span>
+                                        )}
+                                      </div>
+                                      {hasChildren && isExpanded && (
+                                        <div>
+                                          {account.children.map((child) =>
+                                            renderAccountTree(child, level + 1)
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                };
+
+                                return hierarchicalAccounts.map((account) =>
+                                  renderAccountTree(account, 0)
                                 );
                               })()}
-                            </SelectContent>
-                          </Select>
+                            </div>
+                          </div>
                         </div>
                       </div>
 

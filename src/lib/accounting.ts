@@ -1,9 +1,11 @@
 import { supabase } from "./supabase";
-import { Account, TransactionEntry } from "./types";
+import { Account, TransactionEntry, TransactionEntryInput } from "./types";
 
 export class AccountingEngine {
   // Validate double-entry (debits = credits)
-  static validateTransaction(entries: TransactionEntry[]): boolean {
+  static validateTransaction(
+    entries: TransactionEntryInput[] | TransactionEntry[]
+  ): boolean {
     const totalDebits = entries.reduce(
       (sum, entry) => sum + entry.debit_amount,
       0
@@ -16,7 +18,9 @@ export class AccountingEngine {
   }
 
   // Calculate total amount for transaction
-  static calculateTransactionTotal(entries: TransactionEntry[]): number {
+  static calculateTransactionTotal(
+    entries: TransactionEntryInput[] | TransactionEntry[]
+  ): number {
     return entries.reduce(
       (sum, entry) => sum + Math.max(entry.debit_amount, entry.credit_amount),
       0
@@ -24,7 +28,9 @@ export class AccountingEngine {
   }
 
   // Update account balances after transaction
-  static async updateAccountBalances(entries: TransactionEntry[]) {
+  static async updateAccountBalances(
+    entries: (TransactionEntryInput & { transaction_id: string })[]
+  ) {
     for (const entry of entries) {
       const { data: account } = await supabase
         .from("accounts")

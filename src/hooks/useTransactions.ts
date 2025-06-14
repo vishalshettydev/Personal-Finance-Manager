@@ -86,9 +86,9 @@ export const useTransactions = (userId: string | null) => {
         (entry) => entry.accounts?.account_types?.category === "EXPENSE"
       );
 
-      if (hasIncome) return { type: "income", label: "Income" };
-      if (hasExpense) return { type: "expense", label: "Expense" };
-      return { type: "transfer", label: "Transfer" };
+      if (hasIncome) return "income";
+      if (hasExpense) return "expense";
+      return "transfer";
     },
     []
   );

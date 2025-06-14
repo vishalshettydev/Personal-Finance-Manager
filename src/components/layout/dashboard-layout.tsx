@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { User, Settings, LogOut, BarChart3, Home } from "lucide-react";
+import { User, Settings, LogOut, BarChart3, Home, Receipt } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -37,6 +37,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: Home },
+    { name: "Transactions", href: "/transactions", icon: Receipt },
     { name: "Reports", href: "/reports", icon: BarChart3 },
     { name: "Settings", href: "/settings", icon: Settings },
   ];

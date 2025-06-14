@@ -33,7 +33,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Landmark, Plus, User, Bell, Shield, Palette } from "lucide-react";
+import {
+  Landmark,
+  Plus,
+  User,
+  Tag,
+  Shield,
+  Palette,
+  Search,
+  Edit3,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 
 // Types
 
@@ -70,6 +82,14 @@ interface HierarchicalAccount extends Account {
   children: HierarchicalAccount[];
 }
 
+interface Tag {
+  id: string;
+  user_id: string | null;
+  name: string;
+  color: string | null;
+  created_at: string | null;
+}
+
 export default function Settings() {
   const { user, loading, initialize } = useAuthStore();
   const router = useRouter();
@@ -83,6 +103,16 @@ export default function Settings() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [hasTransactions, setHasTransactions] = useState(false);
+
+  // State for tag management
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [isTagModalOpen, setIsTagModalOpen] = useState(false);
+  const [isEditTagModalOpen, setIsEditTagModalOpen] = useState(false);
+  const [editingTag, setEditingTag] = useState<Tag | null>(null);
+  const [tagSearchTerm, setTagSearchTerm] = useState("");
+  const [tagSortOrder, setTagSortOrder] = useState<"asc" | "desc">("asc");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [tagsPerPage] = useState(10);
 
   // Account form state - Updated to match database schema
   const [accountForm, setAccountForm] = useState({
@@ -103,6 +133,17 @@ export default function Settings() {
     parent_id: "none",
     description: "",
     is_placeholder: false,
+  });
+
+  // Tag form state
+  const [tagForm, setTagForm] = useState({
+    name: "",
+    color: "#3B82F6",
+  });
+
+  const [editTagForm, setEditTagForm] = useState({
+    name: "",
+    color: "#3B82F6",
   });
 
   // Fetch data from database
@@ -146,8 +187,25 @@ export default function Settings() {
     }
   };
 
+  const fetchTags = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from("tags")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("name");
+
+      if (error) throw error;
+      setTags(data || []);
+    } catch (error) {
+      console.error("Error fetching tags:", error);
+    }
+  };
+
   const loadData = async () => {
-    await Promise.all([fetchAccountTypes(), fetchAccounts()]);
+    await Promise.all([fetchAccountTypes(), fetchAccounts(), fetchTags()]);
   };
 
   // Check if account has transactions
@@ -399,6 +457,88 @@ export default function Settings() {
     }
   };
 
+  // Tag management functions
+  const handleTagSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase.from("tags").insert({
+        user_id: user.id,
+        name: tagForm.name,
+        color: tagForm.color,
+      });
+
+      if (error) throw error;
+
+      // Refresh tags list
+      await fetchTags();
+
+      // Reset form and close modal
+      setTagForm({
+        name: "",
+        color: "#3B82F6",
+      });
+      setIsTagModalOpen(false);
+    } catch (error) {
+      console.error("Error creating tag:", error);
+      alert("Error creating tag. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleEditTagSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !editingTag) return;
+
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase
+        .from("tags")
+        .update({
+          name: editTagForm.name,
+          color: editTagForm.color,
+        })
+        .eq("id", editingTag.id);
+
+      if (error) throw error;
+
+      // Refresh tags list
+      await fetchTags();
+
+      // Reset form and close modal
+      setEditTagForm({
+        name: "",
+        color: "#3B82F6",
+      });
+      setEditingTag(null);
+      setIsEditTagModalOpen(false);
+    } catch (error) {
+      console.error("Error updating tag:", error);
+      alert("Error updating tag. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteTag = async (tagId: string) => {
+    if (!confirm("Are you sure you want to delete this tag?")) return;
+
+    try {
+      const { error } = await supabase.from("tags").delete().eq("id", tagId);
+
+      if (error) throw error;
+
+      // Refresh tags list
+      await fetchTags();
+    } catch (error) {
+      console.error("Error deleting tag:", error);
+      alert("Error deleting tag. Please try again.");
+    }
+  };
+
   if (loading) {
     return (
       <DashboardLayout>
@@ -443,12 +583,12 @@ export default function Settings() {
               <span className="sm:hidden">Pro</span>
             </TabsTrigger>
             <TabsTrigger
-              value="notifications"
+              value="tags"
               className="flex items-center gap-1 md:gap-2 text-xs md:text-sm p-2 md:p-3 col-span-2 md:col-span-1"
             >
-              <Bell className="h-3 w-3 md:h-4 md:w-4" />
-              <span className="hidden sm:inline">Notifications</span>
-              <span className="sm:hidden">Notif</span>
+              <Tag className="h-3 w-3 md:h-4 md:w-4" />
+              <span className="hidden sm:inline">Tags</span>
+              <span className="sm:hidden">Tags</span>
             </TabsTrigger>
             <TabsTrigger
               value="security"
@@ -1085,18 +1225,221 @@ export default function Settings() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="notifications" className="space-y-6">
+          <TabsContent value="tags" className="space-y-6">
             <Card>
-              <CardHeader>
-                <CardTitle>Notification Preferences</CardTitle>
-                <CardDescription>
-                  Configure how you want to receive notifications
-                </CardDescription>
+              <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+                <div className="min-w-0 flex-1">
+                  <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
+                    <Tag className="h-4 w-4 md:h-5 md:w-5" />
+                    Tag Manager
+                  </CardTitle>
+                  <CardDescription className="text-sm">
+                    Manage tags for organizing your transactions
+                  </CardDescription>
+                </div>
+                <Button
+                  onClick={() => setIsTagModalOpen(true)}
+                  className="flex items-center gap-2 w-full sm:w-auto"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Tag
+                </Button>
               </CardHeader>
               <CardContent>
-                <p className="text-gray-500">
-                  Notification settings coming soon...
-                </p>
+                {/* Search and Sort Controls */}
+                <div className="flex flex-col sm:flex-row gap-4 mb-6">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                    <Input
+                      placeholder="Search tags..."
+                      value={tagSearchTerm}
+                      onChange={(e) => setTagSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      setTagSortOrder(tagSortOrder === "asc" ? "desc" : "asc")
+                    }
+                    className="flex items-center gap-2"
+                  >
+                    Sort by Name {tagSortOrder === "asc" ? "↑" : "↓"}
+                  </Button>
+                </div>
+
+                {/* Tags Table */}
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Tag
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Color
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Created
+                          </th>
+                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {(() => {
+                          // Filter and sort tags
+                          const filteredTags = tags.filter((tag) =>
+                            tag.name
+                              .toLowerCase()
+                              .includes(tagSearchTerm.toLowerCase())
+                          );
+
+                          const sortedTags = [...filteredTags].sort((a, b) => {
+                            if (tagSortOrder === "asc") {
+                              return a.name.localeCompare(b.name);
+                            } else {
+                              return b.name.localeCompare(a.name);
+                            }
+                          });
+
+                          // Pagination
+                          const startIndex = (currentPage - 1) * tagsPerPage;
+                          const endIndex = startIndex + tagsPerPage;
+                          const paginatedTags = sortedTags.slice(
+                            startIndex,
+                            endIndex
+                          );
+                          const totalPages = Math.ceil(
+                            sortedTags.length / tagsPerPage
+                          );
+
+                          if (paginatedTags.length === 0) {
+                            return (
+                              <tr>
+                                <td
+                                  colSpan={4}
+                                  className="px-4 py-8 text-center text-gray-500"
+                                >
+                                  {tagSearchTerm
+                                    ? "No tags found matching your search."
+                                    : "No tags created yet. Create your first tag!"}
+                                </td>
+                              </tr>
+                            );
+                          }
+
+                          return (
+                            <>
+                              {paginatedTags.map((tag) => (
+                                <tr key={tag.id} className="hover:bg-gray-50">
+                                  <td className="px-4 py-4 whitespace-nowrap">
+                                    <div className="flex items-center gap-3">
+                                      <div
+                                        className="w-4 h-4 rounded-full border border-gray-200"
+                                        style={{
+                                          backgroundColor:
+                                            tag.color || "#3B82F6",
+                                        }}
+                                      ></div>
+                                      <span className="text-sm font-medium text-gray-900">
+                                        {tag.name}
+                                      </span>
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-4 whitespace-nowrap">
+                                    <span className="text-sm text-gray-500 font-mono">
+                                      {tag.color || "#3B82F6"}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    {tag.created_at
+                                      ? new Date(
+                                          tag.created_at
+                                        ).toLocaleDateString()
+                                      : "N/A"}
+                                  </td>
+                                  <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <div className="flex items-center justify-end gap-2">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                          setEditingTag(tag);
+                                          setEditTagForm({
+                                            name: tag.name,
+                                            color: tag.color || "#3B82F6",
+                                          });
+                                          setIsEditTagModalOpen(true);
+                                        }}
+                                        className="text-blue-600 hover:text-blue-900"
+                                      >
+                                        <Edit3 className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleDeleteTag(tag.id)}
+                                        className="text-red-600 hover:text-red-900"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+
+                              {/* Pagination Row */}
+                              {totalPages > 1 && (
+                                <tr>
+                                  <td
+                                    colSpan={4}
+                                    className="px-4 py-4 bg-gray-50"
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <div className="text-sm text-gray-700">
+                                        Showing {startIndex + 1} to{" "}
+                                        {Math.min(endIndex, sortedTags.length)}{" "}
+                                        of {sortedTags.length} tags
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() =>
+                                            setCurrentPage(currentPage - 1)
+                                          }
+                                          disabled={currentPage === 1}
+                                        >
+                                          <ChevronLeft className="h-4 w-4" />
+                                        </Button>
+                                        <span className="text-sm text-gray-700">
+                                          Page {currentPage} of {totalPages}
+                                        </span>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() =>
+                                            setCurrentPage(currentPage + 1)
+                                          }
+                                          disabled={currentPage === totalPages}
+                                        >
+                                          <ChevronRight className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -1133,6 +1476,222 @@ export default function Settings() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Tag Modals */}
+        {/* Add Tag Modal */}
+        <Dialog open={isTagModalOpen} onOpenChange={setIsTagModalOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader className="pb-4">
+              <DialogTitle className="text-xl font-semibold flex items-center gap-2">
+                <Plus className="h-5 w-5 text-green-600" />
+                Add New Tag
+              </DialogTitle>
+              <DialogDescription className="text-sm text-gray-600">
+                Create a new tag for organizing your transactions.
+              </DialogDescription>
+            </DialogHeader>
+
+            <form onSubmit={handleTagSubmit} className="space-y-6">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="tagName" className="text-sm font-medium">
+                    Tag Name *
+                  </Label>
+                  <Input
+                    id="tagName"
+                    value={tagForm.name}
+                    onChange={(e) =>
+                      setTagForm({
+                        ...tagForm,
+                        name: e.target.value,
+                      })
+                    }
+                    placeholder="e.g., Food, Travel, Business"
+                    className="h-10"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Color</Label>
+                  <div className="grid grid-cols-8 gap-2">
+                    {[
+                      "#EF4444",
+                      "#F97316",
+                      "#F59E0B",
+                      "#EAB308",
+                      "#84CC16",
+                      "#22C55E",
+                      "#10B981",
+                      "#14B8A6",
+                      "#06B6D4",
+                      "#0EA5E9",
+                      "#3B82F6",
+                      "#6366F1",
+                      "#8B5CF6",
+                      "#A855F7",
+                      "#D946EF",
+                      "#EC4899",
+                      "#F43F5E",
+                      "#64748B",
+                      "#6B7280",
+                      "#374151",
+                    ].map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        onClick={() => setTagForm({ ...tagForm, color })}
+                        className={`w-8 h-8 rounded-full border-2 transition-all ${
+                          tagForm.color === color
+                            ? "border-gray-800 scale-110"
+                            : "border-gray-300 hover:border-gray-500"
+                        }`}
+                        style={{ backgroundColor: color }}
+                        title={color}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-6 border-t">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsTagModalOpen(false)}
+                  disabled={isSubmitting}
+                  className="px-6"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="px-6 bg-green-600 hover:bg-green-700"
+                >
+                  {isSubmitting ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Creating...
+                    </div>
+                  ) : (
+                    "Create Tag"
+                  )}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Tag Modal */}
+        <Dialog open={isEditTagModalOpen} onOpenChange={setIsEditTagModalOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader className="pb-4">
+              <DialogTitle className="text-xl font-semibold flex items-center gap-2">
+                <Tag className="h-5 w-5 text-blue-600" />
+                Edit Tag
+              </DialogTitle>
+              <DialogDescription className="text-sm text-gray-600">
+                Update tag details.
+              </DialogDescription>
+            </DialogHeader>
+
+            <form onSubmit={handleEditTagSubmit} className="space-y-6">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="editTagName" className="text-sm font-medium">
+                    Tag Name *
+                  </Label>
+                  <Input
+                    id="editTagName"
+                    value={editTagForm.name}
+                    onChange={(e) =>
+                      setEditTagForm({
+                        ...editTagForm,
+                        name: e.target.value,
+                      })
+                    }
+                    placeholder="e.g., Food, Travel, Business"
+                    className="h-10"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Color</Label>
+                  <div className="grid grid-cols-8 gap-2">
+                    {[
+                      "#EF4444",
+                      "#F97316",
+                      "#F59E0B",
+                      "#EAB308",
+                      "#84CC16",
+                      "#22C55E",
+                      "#10B981",
+                      "#14B8A6",
+                      "#06B6D4",
+                      "#0EA5E9",
+                      "#3B82F6",
+                      "#6366F1",
+                      "#8B5CF6",
+                      "#A855F7",
+                      "#D946EF",
+                      "#EC4899",
+                      "#F43F5E",
+                      "#64748B",
+                      "#6B7280",
+                      "#374151",
+                    ].map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        onClick={() =>
+                          setEditTagForm({ ...editTagForm, color })
+                        }
+                        className={`w-8 h-8 rounded-full border-2 transition-all ${
+                          editTagForm.color === color
+                            ? "border-gray-800 scale-110"
+                            : "border-gray-300 hover:border-gray-500"
+                        }`}
+                        style={{ backgroundColor: color }}
+                        title={color}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-6 border-t">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setIsEditTagModalOpen(false);
+                    setEditingTag(null);
+                  }}
+                  disabled={isSubmitting}
+                  className="px-6"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="px-6 bg-blue-600 hover:bg-blue-700"
+                >
+                  {isSubmitting ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Updating...
+                    </div>
+                  ) : (
+                    "Update Tag"
+                  )}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );

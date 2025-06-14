@@ -37,7 +37,7 @@ import { Label } from "@/components/ui/label";
 
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabase";
-import { Account, Tag } from "@/lib/types";
+import { Tag } from "@/lib/types";
 import { AccountingEngine } from "@/lib/accounting";
 
 export default function Dashboard() {
@@ -433,7 +433,7 @@ export default function Dashboard() {
                   </DialogTitle>
                   <DialogDescription className="text-sm text-gray-600">
                     Record a new transaction by specifying where money is coming
-                    from and where it's going.
+                    from and where it&apos;s going.
                   </DialogDescription>
                 </DialogHeader>
 
@@ -546,8 +546,8 @@ export default function Dashboard() {
                       <div className="flex items-center">
                         <AlertCircle className="h-4 w-4 text-blue-600 mr-2" />
                         <p className="text-sm text-blue-700">
-                          Select where the money is coming from and where it's
-                          going to.
+                          Select where the money is coming from and where
+                          it&apos;s going to.
                         </p>
                       </div>
                     </div>

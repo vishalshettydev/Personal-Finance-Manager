@@ -107,9 +107,6 @@ export default function Settings() {
   const [expandedParentAccounts, setExpandedParentAccounts] = useState<
     Set<string>
   >(new Set());
-  const [expandedEditParentAccounts, setExpandedEditParentAccounts] = useState<
-    Set<string>
-  >(new Set());
 
   // State for tag management
   const [tags, setTags] = useState<Tag[]>([]);
@@ -282,16 +279,6 @@ export default function Settings() {
       newExpanded.add(accountId);
     }
     setExpandedParentAccounts(newExpanded);
-  };
-
-  const toggleEditParentAccountExpand = (accountId: string) => {
-    const newExpanded = new Set(expandedEditParentAccounts);
-    if (newExpanded.has(accountId)) {
-      newExpanded.delete(accountId);
-    } else {
-      newExpanded.add(accountId);
-    }
-    setExpandedEditParentAccounts(newExpanded);
   };
 
   // Render hierarchical account options

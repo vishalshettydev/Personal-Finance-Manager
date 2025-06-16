@@ -48,16 +48,42 @@ CREATE TABLE public.accounts (
 );
 
 -- Insert default top-level accounts
+WITH top_accounts AS (
+  SELECT 'Assets' AS name, 'Asset' AS type_name
+  UNION ALL SELECT 'Liabilities', 'Liability'
+  UNION ALL SELECT 'Equity', 'Equity'
+  UNION ALL SELECT 'Income', 'Income'
+  UNION ALL SELECT 'Expenses', 'Expense'
+)
 INSERT INTO public.accounts (user_id, name, account_type_id, is_placeholder)
-SELECT NULL::uuid, 'Assets', id, true FROM public.account_types WHERE name = 'Asset'
-UNION ALL
-SELECT NULL::uuid, 'Liabilities', id, true FROM public.account_types WHERE name = 'Liability'
-UNION ALL
-SELECT NULL::uuid, 'Equity', id, true FROM public.account_types WHERE name = 'Equity'
-UNION ALL
-SELECT NULL::uuid, 'Income', id, true FROM public.account_types WHERE name = 'Income'
-UNION ALL
-SELECT NULL::uuid, 'Expenses', id, true FROM public.account_types WHERE name = 'Expense';
+SELECT
+  NULL::uuid,
+  t.name,
+  at.id,
+  true
+FROM top_accounts t
+JOIN public.account_types at ON at.name = t.type_name;
+
+-- Insert 'Opening Balance' sub-account under 'Equity'
+INSERT INTO public.accounts (
+  user_id,
+  parent_id,
+  account_type_id,
+  name,
+  is_placeholder
+)
+SELECT
+  NULL::uuid,
+  equity_acc.id,
+  equity_type.id,
+  'Opening Balance',
+  false
+FROM public.accounts equity_acc
+JOIN public.account_types equity_type
+  ON equity_acc.account_type_id = equity_type.id
+WHERE equity_acc.name = 'Equity'
+  AND equity_type.name = 'Equity'
+LIMIT 1;
 
 -- ========================
 -- TRANSACTIONS (Double Entry System)
@@ -134,7 +160,7 @@ CREATE TABLE public.investment_transactions (
 );
 
 -- ========================
--- INVESTMENT PRICES (Market NAV or Stock Price)
+-- INVESTMENT PRICES
 -- ========================
 CREATE TABLE public.investment_prices (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

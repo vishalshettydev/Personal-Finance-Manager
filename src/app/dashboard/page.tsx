@@ -95,9 +95,12 @@ export default function Dashboard() {
             {/* Right Column - Recent Transactions (60-70%) */}
             <div className="lg:col-span-6">
               <TransactionList
-                transactions={transactions}
+                transactions={transactions.slice(0, 5)} // Show only 5 recent transactions
                 getTransactionType={getTransactionType}
                 loading={transactionsLoading}
+                title="Recent Transactions"
+                showViewAllLink={true}
+                viewAllHref="/transactions"
               />
             </div>
           </div>

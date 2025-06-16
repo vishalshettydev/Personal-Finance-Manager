@@ -6,17 +6,24 @@ import { Button } from "@/components/ui/button";
 import { TransactionSearchFilters } from "./TransactionSearchFilters";
 import { TransactionListItem } from "./TransactionListItem";
 import { TransactionData, TransactionType } from "@/types/transaction";
+import Link from "next/link";
 
 interface TransactionListProps {
   transactions: TransactionData[];
   getTransactionType: (transaction: TransactionData) => TransactionType;
   loading?: boolean;
+  title?: string;
+  showViewAllLink?: boolean;
+  viewAllHref?: string;
 }
 
 export const TransactionList = ({
   transactions,
   getTransactionType,
   loading = false,
+  title = "Recent Transactions",
+  showViewAllLink = false,
+  viewAllHref = "/transactions",
 }: TransactionListProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState<"date" | "amount">("date");
@@ -68,12 +75,14 @@ export const TransactionList = ({
       <div className="bg-white rounded-lg shadow">
         <div className="p-6 border-b border-gray-200">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold text-gray-900">
-              Recent Transactions
-            </h2>
-            <Button variant="outline" size="sm">
-              View All
-            </Button>
+            <h2 className="text-xl font-bold text-gray-900">{title}</h2>
+            {showViewAllLink && (
+              <Link href={viewAllHref}>
+                <Button variant="outline" size="sm">
+                  View All
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
         <div className="p-6">
@@ -90,12 +99,14 @@ export const TransactionList = ({
     <div className="bg-white rounded-lg shadow">
       <div className="p-6 border-b border-gray-200">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold text-gray-900">
-            Recent Transactions
-          </h2>
-          <Button variant="outline" size="sm">
-            View All
-          </Button>
+          <h2 className="text-xl font-bold text-gray-900">{title}</h2>
+          {showViewAllLink && (
+            <Link href={viewAllHref}>
+              <Button variant="outline" size="sm">
+                View All
+              </Button>
+            </Link>
+          )}
         </div>
 
         {/* Search and Sort Controls */}

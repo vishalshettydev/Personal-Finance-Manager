@@ -17,7 +17,7 @@ export const TransactionListItem = ({
   let primaryEntry: TransactionData["transaction_entries"][0] | undefined,
     secondaryEntry: TransactionData["transaction_entries"][0] | undefined;
 
-  if (transactionType.type === "transfer") {
+  if (transactionType === "transfer") {
     // For transfers, show both accounts
     const assetLiabilityEntries = transaction.transaction_entries.filter(
       (entry) =>
@@ -40,11 +40,25 @@ export const TransactionListItem = ({
     );
   }
 
-  const isIncome = transactionType.type === "income";
-  const isExpense = transactionType.type === "expense";
-  const isTransfer = transactionType.type === "transfer";
+  const isIncome = transactionType === "income";
+  const isExpense = transactionType === "expense";
+  const isTransfer = transactionType === "transfer";
 
   const amount = transaction.total_amount;
+
+  // Get transaction type label
+  const getTransactionTypeLabel = (type: TransactionType): string => {
+    switch (type) {
+      case "income":
+        return "Income";
+      case "expense":
+        return "Expense";
+      case "transfer":
+        return "Transfer";
+      default:
+        return "Transaction";
+    }
+  };
 
   return (
     <div className="flex justify-between items-center py-3 border-b hover:bg-gray-50 rounded-lg px-3 transition-colors">
@@ -80,7 +94,9 @@ export const TransactionListItem = ({
               Ref: {transaction.reference_number}
             </p>
           )}
-          <p className="text-xs text-gray-400">{transactionType.label}</p>
+          <p className="text-xs text-gray-400">
+            {getTransactionTypeLabel(transactionType)}
+          </p>
         </div>
       </div>
       <span

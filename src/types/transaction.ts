@@ -43,7 +43,33 @@ export interface TransactionData {
   transaction_entries: TransactionEntry[];
 }
 
-export interface TransactionType {
-  type: "income" | "expense" | "transfer";
+export type TransactionType = "income" | "expense" | "transfer";
+
+export interface TransactionTypeInfo {
+  type: TransactionType;
   label: string;
+}
+
+// Database transaction with entries for pagination hook
+export interface DatabaseTransactionWithEntries {
+  id: string;
+  user_id: string | null;
+  reference_number: string | null;
+  description: string;
+  transaction_date: string;
+  total_amount: number;
+  notes: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  entries: {
+    id: string;
+    amount: number;
+    is_debit: boolean;
+    description: string | null;
+    account: {
+      id: string;
+      name: string;
+      type: string;
+    } | null;
+  }[];
 }

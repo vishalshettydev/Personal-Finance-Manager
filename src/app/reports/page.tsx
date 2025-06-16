@@ -78,19 +78,19 @@ export default function ReportsPage() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">$0.00</div>
+              <div className="text-2xl font-bold text-green-600">₹0</div>
               <div className="text-sm text-gray-500">Total Income</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-red-600">$0.00</div>
+              <div className="text-2xl font-bold text-red-600">₹0</div>
               <div className="text-sm text-gray-500">Total Expenses</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">$0.00</div>
+              <div className="text-2xl font-bold text-blue-600">₹0</div>
               <div className="text-sm text-gray-500">Net Worth</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600">$0.00</div>
+              <div className="text-2xl font-bold text-purple-600">₹0</div>
               <div className="text-sm text-gray-500">Monthly Savings</div>
             </div>
           </div>

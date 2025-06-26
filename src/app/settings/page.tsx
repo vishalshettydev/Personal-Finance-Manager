@@ -354,24 +354,145 @@ export default function Settings() {
 
     setIsSubmitting(true);
     try {
-      const { error } = await supabase.from("accounts").insert({
-        user_id: user.id,
-        name: accountForm.name,
-        code: accountForm.code || null,
-        account_type_id: accountForm.account_type_id,
-        parent_id:
-          !accountForm.parent_id || accountForm.parent_id === "none"
-            ? null
-            : accountForm.parent_id,
-        description: accountForm.description || null,
-        balance: accountForm.is_placeholder
-          ? 0
-          : parseFloat(accountForm.initial_balance) || 0,
-        is_placeholder: accountForm.is_placeholder,
-        is_active: true,
-      });
+      const initialBalance = accountForm.is_placeholder
+        ? 0
+        : parseFloat(accountForm.initial_balance) || 0;
 
-      if (error) throw error;
+      // Step 1: Create the account
+      const { data: newAccount, error: accountError } = await supabase
+        .from("accounts")
+        .insert({
+          user_id: user.id,
+          name: accountForm.name,
+          code: accountForm.code || null,
+          account_type_id: accountForm.account_type_id,
+          parent_id:
+            !accountForm.parent_id || accountForm.parent_id === "none"
+              ? null
+              : accountForm.parent_id,
+          description: accountForm.description || null,
+          balance: initialBalance,
+          is_placeholder: accountForm.is_placeholder,
+          is_active: true,
+        })
+        .select()
+        .single();
+
+      if (accountError) throw accountError;
+
+      // Step 2: If initial balance > 0, create opening balance transaction
+      if (initialBalance > 0 && newAccount) {
+        // Find the "Opening Balance" account (it should be under Equity account)
+        let openingBalanceAccount = null;
+
+        // First, find the Equity account (parent)
+        const { data: equityAccount, error: equityError } = await supabase
+          .from("accounts")
+          .select("id, name, user_id")
+          .eq("name", "Equity")
+          .filter("user_id", "is", null)
+          .single();
+
+        if (equityError || !equityAccount) {
+          console.error("Equity account not found:", equityError);
+          throw new Error(
+            "Database not properly initialized - Equity account missing"
+          );
+        }
+
+        // Now find the Opening Balance account under Equity
+        const { data: openingBalance, error: openingBalanceError } =
+          await supabase
+            .from("accounts")
+            .select("id, name, user_id, parent_id")
+            .eq("name", "Opening Balance")
+            .eq("parent_id", equityAccount.id)
+            .filter("user_id", "is", null)
+            .single();
+
+        if (!openingBalanceError && openingBalance) {
+          openingBalanceAccount = openingBalance;
+        } else {
+          // Get the Equity account type for the new Opening Balance account
+          const { data: equityAccountType, error: typeError } = await supabase
+            .from("account_types")
+            .select("id")
+            .eq("name", "Equity")
+            .single();
+
+          if (typeError || !equityAccountType) {
+            console.error("Equity account type not found:", typeError);
+            throw new Error(
+              "Database not properly initialized - Equity account type missing"
+            );
+          }
+
+          // Create the Opening Balance account
+          const { data: newOpeningBalance, error: createError } = await supabase
+            .from("accounts")
+            .insert({
+              user_id: null,
+              parent_id: equityAccount.id,
+              account_type_id: equityAccountType.id,
+              name: "Opening Balance",
+              is_placeholder: false,
+              is_active: true,
+              balance: 0,
+            })
+            .select("id, name, user_id, parent_id")
+            .single();
+
+          if (createError || !newOpeningBalance) {
+            console.error(
+              "Failed to create Opening Balance account:",
+              createError
+            );
+            throw new Error("Could not create Opening Balance account");
+          }
+
+          openingBalanceAccount = newOpeningBalance;
+        }
+
+        // Create the transaction
+        const { data: transaction, error: transactionError } = await supabase
+          .from("transactions")
+          .insert({
+            user_id: user.id,
+            reference_number: `INIT-${newAccount.id.substring(0, 8)}`,
+            description: `Initial balance for ${accountForm.name}`,
+            transaction_date: new Date().toISOString().split("T")[0], // Today's date
+            total_amount: initialBalance,
+            notes: `Opening balance transaction for account: ${accountForm.name}`,
+          })
+          .select()
+          .single();
+
+        if (transactionError) throw transactionError;
+
+        // Create the double entries
+        const transactionEntries = [
+          {
+            transaction_id: transaction.id,
+            account_id: openingBalanceAccount.id, // Debit Opening Balance
+            debit_amount: initialBalance,
+            credit_amount: 0,
+            description: `Initial balance for ${accountForm.name}`,
+          },
+          {
+            transaction_id: transaction.id,
+            account_id: newAccount.id, // Credit the new account
+            debit_amount: 0,
+            credit_amount: initialBalance,
+            description: `Initial balance for ${accountForm.name}`,
+          },
+        ];
+
+        const { error: entriesError } = await supabase
+          .from("transaction_entries")
+          .insert(transactionEntries);
+
+        if (entriesError) throw entriesError;
+      }
 
       // Refresh accounts list
       await fetchAccounts();

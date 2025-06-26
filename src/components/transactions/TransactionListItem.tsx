@@ -13,38 +13,40 @@ export const TransactionListItem = ({
   transaction,
   transactionType,
 }: TransactionListItemProps) => {
-  // Find the primary account for display
-  let primaryEntry: TransactionData["transaction_entries"][0] | undefined,
-    secondaryEntry: TransactionData["transaction_entries"][0] | undefined;
-
-  if (transactionType === "transfer") {
-    // For transfers, show both accounts
-    const assetLiabilityEntries = transaction.transaction_entries.filter(
-      (entry) =>
-        ["ASSET", "LIABILITY"].includes(
-          entry.accounts?.account_types?.category || ""
-        )
-    );
-    primaryEntry = assetLiabilityEntries[0];
-    secondaryEntry = assetLiabilityEntries[1];
-  } else {
-    // For income/expense, find the income/expense entry
-    primaryEntry = transaction.transaction_entries.find(
-      (entry) =>
-        entry.accounts?.account_types?.category === "INCOME" ||
-        entry.accounts?.account_types?.category === "EXPENSE"
-    );
-    // Get the other account (asset/liability) for display
-    secondaryEntry = transaction.transaction_entries.find(
-      (entry) => entry.id !== primaryEntry?.id
-    );
-  }
-
   const isIncome = transactionType === "income";
   const isExpense = transactionType === "expense";
   const isTransfer = transactionType === "transfer";
 
   const amount = transaction.total_amount;
+
+  // Get debit and credit entries for display
+  const debitEntry = transaction.transaction_entries?.find(
+    (entry) => (entry.debit_amount || 0) > 0
+  );
+  const creditEntry = transaction.transaction_entries?.find(
+    (entry) => (entry.credit_amount || 0) > 0
+  );
+
+  // Get account display text based on transaction type
+  const getAccountDisplayText = () => {
+    if (isTransfer) {
+      // For transfers, show: From Account → To Account
+      // The account that was debited (money taken from) → account that was credited (money added to)
+      const fromAccount = creditEntry?.accounts?.name || "Unknown Account";
+      const toAccount = debitEntry?.accounts?.name || "Unknown Account";
+      return `${fromAccount} → ${toAccount}`;
+    } else if (isIncome) {
+      // For income, show the income source (credit) and where it went (debit)
+      const incomeSource = creditEntry?.accounts?.name || "Income Source";
+      const destinationAccount = debitEntry?.accounts?.name || "Account";
+      return `${incomeSource} → ${destinationAccount}`;
+    } else {
+      // For expense, show where money came from (credit) and what it was spent on (debit)
+      const sourceAccount = creditEntry?.accounts?.name || "Account";
+      const expenseAccount = debitEntry?.accounts?.name || "Expense";
+      return `${sourceAccount} → ${expenseAccount}`;
+    }
+  };
 
   // Get transaction type label
   const getTransactionTypeLabel = (type: TransactionType): string => {
@@ -79,15 +81,8 @@ export const TransactionListItem = ({
         <div>
           <p className="font-medium text-gray-900">{transaction.description}</p>
           <p className="text-sm text-gray-500">
-            {isTransfer ? (
-              <>
-                {primaryEntry?.accounts?.name || "Account"} →{" "}
-                {secondaryEntry?.accounts?.name || "Account"}
-              </>
-            ) : (
-              <>{secondaryEntry?.accounts?.name || "Account"}</>
-            )}{" "}
-            • {formatRelativeDate(transaction.transaction_date)}
+            {getAccountDisplayText()} •{" "}
+            {formatRelativeDate(transaction.transaction_date)}
           </p>
           {transaction.reference_number && (
             <p className="text-xs text-gray-400">

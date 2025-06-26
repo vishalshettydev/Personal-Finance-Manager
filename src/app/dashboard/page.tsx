@@ -1,18 +1,61 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAuthStore } from "@/stores/auth";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import ChartOfAccounts from "@/components/ChartOfAccounts";
 import { TransactionList } from "@/components/transactions/TransactionList";
 import { StatsCards } from "@/components/dashboard/StatsCards";
+import { AddTransactionModal } from "@/components/transactions/AddTransactionModal";
 import { useTransactions } from "@/hooks/useTransactions";
 import { useAccounts } from "@/hooks/useAccounts";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { FullScreenLoading } from "@/components/common/LoadingSpinner";
+import { supabase } from "@/lib/supabase";
+import { Tag } from "@/lib/types";
+
+// Database response type that matches what Supabase returns
+interface DatabaseAccount {
+  id: string;
+  user_id: string | null;
+  parent_id: string | null;
+  account_type_id: string | null;
+  name: string;
+  code: string | null;
+  description: string | null;
+  is_placeholder?: boolean | null;
+  is_active: boolean | null;
+  balance: number | null;
+  created_at: string | null;
+  updated_at: string | null;
+  account_types: {
+    id: string;
+    name: string;
+    category: string;
+  } | null;
+}
+
+// Normalized Account type for the component
+interface Account {
+  id: string;
+  name: string;
+  parent_id: string | null;
+  is_placeholder: boolean;
+  is_active: boolean;
+  balance: number;
+  account_types: {
+    id: string;
+    name: string;
+    category: string;
+  };
+}
 
 export default function Dashboard() {
   const { user, loading, initialize } = useAuthStore();
+
+  // Data states for the modal
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
 
   // Custom hooks for data management
   const {
@@ -34,8 +77,93 @@ export default function Dashboard() {
     if (user) {
       fetchAccounts();
       fetchAllTransactions();
+      fetchAccountsForModal();
+      fetchTagsForModal();
     }
   }, [user, fetchAccounts, fetchAllTransactions]);
+
+  // Normalize database response to our component interface
+  const normalizeAccounts = (dbAccounts: DatabaseAccount[]): Account[] => {
+    return dbAccounts
+      .filter(
+        (
+          acc
+        ): acc is DatabaseAccount & {
+          account_types: NonNullable<DatabaseAccount["account_types"]>;
+        } => acc.account_types !== null
+      )
+      .map((acc) => ({
+        id: acc.id,
+        name: acc.name,
+        parent_id: acc.parent_id,
+        is_placeholder: acc.is_placeholder ?? false,
+        is_active: acc.is_active ?? true,
+        balance: acc.balance ?? 0,
+        account_types: acc.account_types,
+      }));
+  };
+
+  // Fetch accounts from database for modal
+  const fetchAccountsForModal = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from("accounts")
+        .select(
+          `
+          *,
+          account_types (
+            id,
+            name,
+            category
+          )
+        `
+        )
+        .or(`user_id.eq.${user.id},user_id.is.null`)
+        .eq("is_active", true)
+        .order("name");
+
+      if (error) throw error;
+
+      // Normalize the database response
+      const normalizedAccounts = normalizeAccounts(data || []);
+      setAccounts(normalizedAccounts);
+    } catch (error) {
+      console.error("Error fetching accounts:", error);
+    }
+  };
+
+  // Fetch tags from database for modal
+  const fetchTagsForModal = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from("tags")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("name");
+
+      if (error) throw error;
+      setTags(data || []);
+    } catch (error) {
+      console.error("Error fetching tags:", error);
+    }
+  };
+
+  const handleTransactionAdded = () => {
+    fetchAllTransactions();
+  };
+
+  const handleAccountsRefresh = () => {
+    fetchAccounts();
+    fetchAccountsForModal();
+  };
+
+  const handleTagsRefresh = () => {
+    fetchTagsForModal();
+  };
 
   if (loading) {
     return <FullScreenLoading text="Loading your dashboard..." />;
@@ -63,9 +191,17 @@ export default function Dashboard() {
                 Welcome back, {user.email}!
               </h1>
               <p className="text-gray-600">
-                Here&apos;s an overview of your financial data.
+                Here&rsquo;s an overview of your financial data.
               </p>
             </div>
+            <AddTransactionModal
+              userId={user.id}
+              accounts={accounts}
+              tags={tags}
+              onTransactionAdded={handleTransactionAdded}
+              onAccountsRefresh={handleAccountsRefresh}
+              onTagsRefresh={handleTagsRefresh}
+            />
           </div>
 
           {/* Quick Stats - Full Width */}

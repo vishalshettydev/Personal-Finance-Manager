@@ -45,6 +45,9 @@ export const TransactionList = ({
           transaction.notes?.toLowerCase().includes(searchTermLower) ||
           transaction.transaction_entries?.some((entry) =>
             entry.accounts?.name?.toLowerCase().includes(searchTermLower)
+          ) ||
+          transaction.transaction_tags?.some((tagEntry) =>
+            tagEntry.tags.name.toLowerCase().includes(searchTermLower)
           )
       );
     }

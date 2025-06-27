@@ -30,6 +30,16 @@ export interface TransactionEntry {
   accounts: Account | null;
 }
 
+export interface Tag {
+  id: string;
+  name: string;
+  color: string | null;
+}
+
+export interface TransactionTag {
+  tags: Tag;
+}
+
 export interface TransactionData {
   id: string;
   user_id: string | null;
@@ -41,6 +51,7 @@ export interface TransactionData {
   created_at: string | null;
   updated_at: string | null;
   transaction_entries: TransactionEntry[];
+  transaction_tags?: TransactionTag[];
 }
 
 export type TransactionType = "income" | "expense" | "transfer";

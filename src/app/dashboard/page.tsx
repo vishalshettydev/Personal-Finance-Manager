@@ -9,6 +9,7 @@ import { StatsCards } from "@/components/dashboard/StatsCards";
 import { AddTransactionModal } from "@/components/transactions/AddTransactionModal";
 import { useTransactions } from "@/hooks/useTransactions";
 import { useAccounts } from "@/hooks/useAccounts";
+import { useDashboardStats } from "@/hooks/useDashboardStats";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { FullScreenLoading } from "@/components/common/LoadingSpinner";
 import { supabase } from "@/lib/supabase";
@@ -66,6 +67,13 @@ export default function Dashboard() {
   } = useTransactions(user?.id || null);
 
   const { fetchAccounts } = useAccounts(user?.id || null);
+
+  const {
+    stats,
+    loading: statsLoading,
+    error: statsError,
+    refetch: refetchStats,
+  } = useDashboardStats(user?.id || null);
 
   useEffect(() => {
     if (!user && loading) {
@@ -154,11 +162,13 @@ export default function Dashboard() {
 
   const handleTransactionAdded = () => {
     fetchAllTransactions();
+    refetchStats(); // Refresh dashboard stats when new transaction is added
   };
 
   const handleAccountsRefresh = () => {
     fetchAccounts();
     fetchAccountsForModal();
+    refetchStats(); // Refresh dashboard stats when accounts change
   };
 
   const handleTagsRefresh = () => {
@@ -205,7 +215,27 @@ export default function Dashboard() {
           </div>
 
           {/* Quick Stats - Full Width */}
-          <StatsCards />
+          {statsError ? (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <p className="text-red-600">
+                Error loading dashboard statistics: {statsError}
+              </p>
+            </div>
+          ) : (
+            <StatsCards
+              totalBalance={stats.totalBalance}
+              income={stats.income}
+              expenses={stats.expenses}
+              netWorth={stats.netWorth}
+              assets={stats.assets}
+              liabilities={stats.liabilities}
+              totalInvestments={stats.totalInvestments}
+              stocks={stats.stocks}
+              mutualFunds={stats.mutualFunds}
+              bondsAndFDs={stats.bondsAndFDs}
+              loading={statsLoading}
+            />
+          )}
 
           {/* Two Column Layout */}
           <div className="grid grid-cols-1 lg:grid-cols-10 gap-6">

@@ -10,32 +10,52 @@ import {
   LineChart,
 } from "lucide-react";
 import { formatINR } from "@/utils/formatters";
+import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 
 interface StatsCardsProps {
-  totalBalance?: number;
-  income?: number;
-  expenses?: number;
-  netWorth?: number;
-  assets?: number;
-  liabilities?: number;
-  totalInvestments?: number;
-  stocks?: number;
-  mutualFunds?: number;
-  bondsAndFDs?: number;
+  totalBalance: number;
+  income: number;
+  expenses: number;
+  netWorth: number;
+  assets: number;
+  liabilities: number;
+  totalInvestments: number;
+  stocks: number;
+  mutualFunds: number;
+  bondsAndFDs: number;
+  loading?: boolean;
 }
 
 export const StatsCards = ({
-  totalBalance = 1245000,
-  income = 420000,
-  expenses = 315000,
-  netWorth = 1850000,
-  assets = 2150000,
-  liabilities = 300000,
-  totalInvestments = 875000,
-  stocks = 450000,
-  mutualFunds = 325000,
-  bondsAndFDs = 100000,
+  totalBalance,
+  income,
+  expenses,
+  netWorth,
+  assets,
+  liabilities,
+  totalInvestments,
+  stocks,
+  mutualFunds,
+  bondsAndFDs,
+  loading = false,
 }: StatsCardsProps) => {
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {[1, 2, 3].map((i) => (
+          <div
+            key={i}
+            className="bg-white p-6 rounded-lg shadow-md border-l-4 border-gray-300"
+          >
+            <div className="flex items-center justify-center h-32">
+              <LoadingSpinner size="md" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       {/* Total Balance Card */}

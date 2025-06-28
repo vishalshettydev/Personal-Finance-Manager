@@ -3,6 +3,7 @@
 import { TrendingUp, TrendingDown, ChevronRight } from "lucide-react";
 import { formatINR, formatRelativeDate } from "@/utils/formatters";
 import { TransactionData, TransactionType } from "@/types/transaction";
+import { TransactionTags } from "./TransactionTags";
 
 interface TransactionListItemProps {
   transaction: TransactionData;
@@ -92,6 +93,12 @@ export const TransactionListItem = ({
           <p className="text-xs text-gray-400">
             {getTransactionTypeLabel(transactionType)}
           </p>
+          {/* Display tags */}
+          <TransactionTags
+            tags={transaction.transaction_tags?.map((tt) => tt.tags) || []}
+            size="sm"
+            maxVisible={3}
+          />
         </div>
       </div>
       <span

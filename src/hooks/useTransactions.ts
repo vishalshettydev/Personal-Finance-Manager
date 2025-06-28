@@ -15,7 +15,7 @@ export const useTransactions = (userId: string | null) => {
     setError(null);
 
     try {
-      // Fetch all transactions with their entries
+      // Fetch all transactions with their entries and tags
       const { data: transactionsData, error: transactionsError } =
         await supabase
           .from("transactions")
@@ -29,6 +29,13 @@ export const useTransactions = (userId: string | null) => {
               account_types (
                 *
               )
+            )
+          ),
+          transaction_tags (
+            tags (
+              id,
+              name,
+              color
             )
           )
         `

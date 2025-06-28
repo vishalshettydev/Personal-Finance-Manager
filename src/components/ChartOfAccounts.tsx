@@ -81,6 +81,52 @@ export default function ChartOfAccounts({
     }).format(amount);
   };
 
+  // Calculate actual balance from transaction entries
+  const calculateAccountBalance = async (
+    accountId: string,
+    accountCategory: string
+  ): Promise<number> => {
+    try {
+      const { data: entries, error } = await supabase
+        .from("transaction_entries")
+        .select("debit_amount, credit_amount")
+        .eq("account_id", accountId);
+
+      if (error) throw error;
+
+      let totalDebits = 0;
+      let totalCredits = 0;
+
+      entries?.forEach((entry) => {
+        totalDebits += entry.debit_amount || 0;
+        totalCredits += entry.credit_amount || 0;
+      });
+
+      // Calculate balance based on account type (normal balance side)
+      // Assets, Expenses: Debit increases, Credit decreases -> Debit - Credit
+      // Liabilities, Equity, Income: Credit increases, Debit decreases -> Credit - Debit
+      let calculatedBalance = 0;
+      switch (accountCategory) {
+        case "ASSET":
+        case "EXPENSE":
+          calculatedBalance = totalDebits - totalCredits;
+          break;
+        case "LIABILITY":
+        case "EQUITY":
+        case "INCOME":
+          calculatedBalance = totalCredits - totalDebits;
+          break;
+        default:
+          calculatedBalance = totalDebits - totalCredits;
+      }
+
+      return calculatedBalance;
+    } catch (error) {
+      console.error("Error calculating account balance:", error);
+      return 0;
+    }
+  };
+
   // Fetch accounts from database
   const fetchAccounts = async () => {
     if (!user) return;
@@ -102,7 +148,22 @@ export default function ChartOfAccounts({
         .order("name");
 
       if (error) throw error;
-      setAccounts(data || []);
+
+      // Calculate real balances for each account
+      const accountsWithBalances = await Promise.all(
+        (data || []).map(async (account) => {
+          const calculatedBalance = await calculateAccountBalance(
+            account.id,
+            account.account_types?.category || "ASSET"
+          );
+          return {
+            ...account,
+            balance: calculatedBalance,
+          };
+        })
+      );
+
+      setAccounts(accountsWithBalances);
     } catch (error) {
       console.error("Error fetching accounts:", error);
     }
@@ -320,7 +381,7 @@ export default function ChartOfAccounts({
 
           {hasChildren && (
             <span className="ml-auto text-xs font-medium text-blue-600 flex-shrink-0 min-w-0">
-              {formatINR(getTotalBalance(node))}
+              {formatINR(Math.abs(getTotalBalance(node)))}
             </span>
           )}
 

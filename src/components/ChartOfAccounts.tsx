@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/auth";
 import {
@@ -82,53 +82,45 @@ export default function ChartOfAccounts({
   };
 
   // Calculate actual balance from transaction entries
-  const calculateAccountBalance = async (
-    accountId: string,
-    accountCategory: string
-  ): Promise<number> => {
-    try {
-      const { data: entries, error } = await supabase
-        .from("transaction_entries")
-        .select("debit_amount, credit_amount")
-        .eq("account_id", accountId);
+  const calculateAccountBalance = useCallback(
+    async (accountId: string): Promise<number> => {
+      try {
+        const { data: entries, error } = await supabase
+          .from("transaction_entries")
+          .select("entry_type, amount")
+          .eq("account_id", accountId);
 
-      if (error) throw error;
+        if (error) throw error;
 
-      let totalDebits = 0;
-      let totalCredits = 0;
+        let balance = 0;
 
-      entries?.forEach((entry) => {
-        totalDebits += entry.debit_amount || 0;
-        totalCredits += entry.credit_amount || 0;
-      });
+        entries?.forEach((entry) => {
+          const amount = entry.amount || 0;
+          const entryType = entry.entry_type;
 
-      // Calculate balance based on account type (normal balance side)
-      // Assets, Expenses: Debit increases, Credit decreases -> Debit - Credit
-      // Liabilities, Equity, Income: Credit increases, Debit decreases -> Credit - Debit
-      let calculatedBalance = 0;
-      switch (accountCategory) {
-        case "ASSET":
-        case "EXPENSE":
-          calculatedBalance = totalDebits - totalCredits;
-          break;
-        case "LIABILITY":
-        case "EQUITY":
-        case "INCOME":
-          calculatedBalance = totalCredits - totalDebits;
-          break;
-        default:
-          calculatedBalance = totalDebits - totalCredits;
+          // Apply simplified logic: CREDIT = money deposited (+), DEBIT = money withdrawn (-)
+          if (entryType === "CREDIT") {
+            balance += amount; // Money deposited/received
+          } else if (entryType === "DEBIT") {
+            balance -= amount; // Money withdrawn/spent
+          } else if (entryType === "BUY") {
+            balance -= amount; // Money going out to buy
+          } else if (entryType === "SELL") {
+            balance += amount; // Money coming in from sale
+          }
+        });
+
+        return balance;
+      } catch {
+        // Silently handle errors and return 0 balance
+        return 0;
       }
-
-      return calculatedBalance;
-    } catch (error) {
-      console.error("Error calculating account balance:", error);
-      return 0;
-    }
-  };
+    },
+    []
+  );
 
   // Fetch accounts from database
-  const fetchAccounts = async () => {
+  const fetchAccounts = useCallback(async () => {
     if (!user) return;
 
     try {
@@ -152,10 +144,7 @@ export default function ChartOfAccounts({
       // Calculate real balances for each account
       const accountsWithBalances = await Promise.all(
         (data || []).map(async (account) => {
-          const calculatedBalance = await calculateAccountBalance(
-            account.id,
-            account.account_types?.category || "ASSET"
-          );
+          const calculatedBalance = await calculateAccountBalance(account.id);
           return {
             ...account,
             balance: calculatedBalance,
@@ -167,7 +156,7 @@ export default function ChartOfAccounts({
     } catch (error) {
       console.error("Error fetching accounts:", error);
     }
-  };
+  }, [user, calculateAccountBalance]);
 
   // Get icon based on account type
   const getAccountIcon = (accountType: string, accountName: string) => {

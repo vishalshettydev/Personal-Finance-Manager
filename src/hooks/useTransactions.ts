@@ -23,7 +23,14 @@ export const useTransactions = (userId: string | null) => {
             `
           *,
           transaction_entries (
-            *,
+            id,
+            transaction_id,
+            account_id,
+            quantity,
+            price,
+            entry_type,
+            amount,
+            description,
             accounts (
               *,
               account_types (

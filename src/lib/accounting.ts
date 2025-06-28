@@ -2,18 +2,18 @@ import { supabase } from "./supabase";
 import { Account, TransactionEntry, TransactionEntryInput } from "./types";
 
 export class AccountingEngine {
-  // Validate double-entry (debits = credits)
+  // Validate double-entry (total inflows = total outflows)
   static validateTransaction(
     entries: TransactionEntryInput[] | TransactionEntry[]
   ): boolean {
-    const totalDebits = entries.reduce(
-      (sum, entry) => sum + entry.debit_amount,
-      0
-    );
-    const totalCredits = entries.reduce(
-      (sum, entry) => sum + entry.credit_amount,
-      0
-    );
+    const totalCredits = entries
+      .filter((entry) => entry.entry_type === "CREDIT")
+      .reduce((sum, entry) => sum + entry.amount, 0);
+
+    const totalDebits = entries
+      .filter((entry) => entry.entry_type === "DEBIT")
+      .reduce((sum, entry) => sum + entry.amount, 0);
+
     return Math.abs(totalDebits - totalCredits) < 0.01; // Handle floating point precision
   }
 
@@ -21,10 +21,7 @@ export class AccountingEngine {
   static calculateTransactionTotal(
     entries: TransactionEntryInput[] | TransactionEntry[]
   ): number {
-    return entries.reduce(
-      (sum, entry) => sum + Math.max(entry.debit_amount, entry.credit_amount),
-      0
-    );
+    return entries.reduce((sum, entry) => sum + entry.amount, 0) / 2; // Divide by 2 since each transaction has equal debits and credits
   }
 
   // Update account balances after transaction
@@ -43,11 +40,10 @@ export class AccountingEngine {
         .eq("id", entry.account_id)
         .single();
 
-      if (account && account.account_type) {
-        const isDebitAccount = account.account_type.category === "DEBIT";
-        const balanceChange = isDebitAccount
-          ? entry.debit_amount - entry.credit_amount
-          : entry.credit_amount - entry.debit_amount;
+      if (account) {
+        // Apply simplified logic: CREDIT = money deposited (+), DEBIT = money withdrawn (-)
+        const balanceChange =
+          entry.entry_type === "CREDIT" ? entry.amount : -entry.amount;
 
         await supabase
           .from("accounts")

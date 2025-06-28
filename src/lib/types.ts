@@ -39,16 +39,20 @@ export interface TransactionEntry {
   id: string;
   transaction_id: string;
   account_id: string;
-  debit_amount: number;
-  credit_amount: number;
+  quantity: number;
+  price: number;
+  entry_type: "BUY" | "SELL" | "DEBIT" | "CREDIT";
+  amount: number;
   description?: string;
   account?: Account;
 }
 
 export interface TransactionEntryInput {
   account_id: string;
-  debit_amount: number;
-  credit_amount: number;
+  quantity: number;
+  price: number;
+  entry_type: "BUY" | "SELL" | "DEBIT" | "CREDIT";
+  amount: number;
   description?: string;
 }
 

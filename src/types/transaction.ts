@@ -24,8 +24,10 @@ export interface TransactionEntry {
   id: string;
   transaction_id: string | null;
   account_id: string | null;
-  debit_amount: number | null;
-  credit_amount: number | null;
+  quantity: number | null;
+  price: number | null;
+  entry_type: "BUY" | "SELL" | "DEBIT" | "CREDIT";
+  amount: number | null;
   description: string | null;
   accounts: Account | null;
 }

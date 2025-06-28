@@ -474,15 +474,19 @@ export default function Settings() {
           {
             transaction_id: transaction.id,
             account_id: openingBalanceAccount.id, // Debit Opening Balance
-            debit_amount: initialBalance,
-            credit_amount: 0,
+            quantity: 1,
+            price: initialBalance,
+            entry_type: "DEBIT" as const,
+            amount: initialBalance,
             description: `Initial balance for ${accountForm.name}`,
           },
           {
             transaction_id: transaction.id,
             account_id: newAccount.id, // Credit the new account
-            debit_amount: 0,
-            credit_amount: initialBalance,
+            quantity: 1,
+            price: initialBalance,
+            entry_type: "CREDIT" as const,
+            amount: initialBalance,
             description: `Initial balance for ${accountForm.name}`,
           },
         ];

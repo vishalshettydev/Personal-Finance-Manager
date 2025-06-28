@@ -53,7 +53,10 @@ export const useDashboardStats = (userId: string | null) => {
         .or(`user_id.eq.${userId},user_id.is.null`)
         .eq("is_active", true);
 
-      if (accountsError) throw accountsError;
+      if (accountsError) {
+        console.error("Error fetching accounts:", accountsError);
+        throw new Error(`Failed to fetch accounts: ${accountsError.message}`);
+      }
 
       // Calculate income and expenses from ALL transaction entries
       const { data: transactions, error: transactionsError } = await supabase
@@ -62,7 +65,13 @@ export const useDashboardStats = (userId: string | null) => {
           `
           *,
           transaction_entries (
-            *,
+            id,
+            account_id,
+            quantity,
+            price,
+            entry_type,
+            amount,
+            description,
             accounts (
               *,
               account_types (
@@ -75,15 +84,36 @@ export const useDashboardStats = (userId: string | null) => {
         .eq("user_id", userId)
         .order("transaction_date", { ascending: false });
 
-      if (transactionsError) throw transactionsError;
+      if (transactionsError) {
+        console.error("Error fetching transactions:", transactionsError);
+        throw new Error(
+          `Failed to fetch transactions: ${transactionsError.message}`
+        );
+      }
 
-      // Fetch investments data
-      const { data: investments, error: investmentsError } = await supabase
-        .from("investments")
-        .select("*")
-        .eq("user_id", userId);
+      // Fetch investments data (optional - table may not exist)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let investments: any[] = [];
+      try {
+        const { data: investmentsData, error: investmentsError } =
+          await supabase.from("investments").select("*").eq("user_id", userId);
 
-      if (investmentsError) throw investmentsError;
+        if (investmentsError) {
+          console.warn(
+            "Investments table may not exist, skipping:",
+            investmentsError
+          );
+          // Don't throw error for investments table - it's optional
+        } else {
+          investments = investmentsData || [];
+        }
+      } catch (investmentError) {
+        console.warn(
+          "Error fetching investments (table may not exist):",
+          investmentError
+        );
+        // Investments are optional, continue without them
+      }
 
       // Calculate totals by account category
       let assets = 0;
@@ -99,34 +129,29 @@ export const useDashboardStats = (userId: string | null) => {
       const accountBalances = new Map<string, number>();
 
       // First, calculate balance for each account from transaction entries
+      // Using simplified logic: CREDIT = money deposited (+), DEBIT = money withdrawn (-)
       transactions?.forEach((transaction) => {
         transaction.transaction_entries?.forEach((entry) => {
           const accountId = entry.account_id;
-          const category = entry.accounts?.account_types?.category;
-          const debitAmount = entry.debit_amount || 0;
-          const creditAmount = entry.credit_amount || 0;
+          const amount = entry.amount || 0;
+          const entryType = entry.entry_type;
 
-          if (!accountId || !category) return;
+          if (!accountId) return;
 
           const currentBalance = accountBalances.get(accountId) || 0;
-          let newBalance = currentBalance;
-
-          // Calculate balance based on account type (normal balance side)
-          switch (category) {
-            case "ASSET":
-            case "EXPENSE":
-              // Assets and Expenses increase with debits, decrease with credits
-              newBalance = currentBalance + debitAmount - creditAmount;
-              break;
-            case "LIABILITY":
-            case "EQUITY":
-            case "INCOME":
-              // Liabilities, Equity, and Income increase with credits, decrease with debits
-              newBalance = currentBalance + creditAmount - debitAmount;
-              break;
+          // Simple logic: CREDIT adds to balance, DEBIT subtracts from balance
+          let balanceChange = 0;
+          if (entryType === "CREDIT") {
+            balanceChange = amount;
+          } else if (entryType === "DEBIT") {
+            balanceChange = -amount;
+          } else if (entryType === "BUY") {
+            balanceChange = -amount; // Money going out
+          } else if (entryType === "SELL") {
+            balanceChange = amount; // Money coming in
           }
 
-          accountBalances.set(accountId, newBalance);
+          accountBalances.set(accountId, currentBalance + balanceChange);
         });
       });
 
@@ -137,35 +162,68 @@ export const useDashboardStats = (userId: string | null) => {
 
         switch (category) {
           case "ASSET":
-            // Include all asset balances (positive and negative)
+            // Assets: Include all asset balances (positive when you own money/things)
             assets += balance;
             break;
           case "LIABILITY":
-            // Include all liability balances (positive and negative)
-            liabilities += balance;
+            // Liabilities: Credit balance = money you owe (positive liability)
+            // For net worth calculation, we want positive liabilities to be subtracted
+            liabilities += Math.abs(balance); // Ensure liabilities are always positive for net worth calc
             break;
         }
       });
 
       // Calculate income and expenses from transactions
+      // With simplified logic: track actual money flow to/from income and expense accounts
       transactions?.forEach((transaction) => {
         transaction.transaction_entries?.forEach((entry) => {
           const category = entry.accounts?.account_types?.category;
-          const debitAmount = entry.debit_amount || 0;
-          const creditAmount = entry.credit_amount || 0;
+          const amount = entry.amount || 0;
+          const entryType = entry.entry_type;
 
           switch (category) {
             case "INCOME":
-              // Income accounts increase with credits
-              income += creditAmount;
+              // Income represents money you've earned - track credits to income accounts
+              if (entryType === "CREDIT") {
+                income += amount;
+              }
               break;
             case "EXPENSE":
-              // Expense accounts increase with debits
-              expenses += debitAmount;
+              // Expenses represent money you've spent - track debits to expense accounts
+              if (entryType === "DEBIT") {
+                expenses += amount;
+              }
               break;
           }
         });
       });
+
+      // Alternative calculation: If no INCOME/EXPENSE accounts found,
+      // calculate from account balance changes (income = money in, expenses = money out)
+      if (income === 0 && expenses === 0) {
+        transactions?.forEach((transaction) => {
+          transaction.transaction_entries?.forEach((entry) => {
+            const amount = entry.amount || 0;
+            const entryType = entry.entry_type;
+            const accountCategory = entry.accounts?.account_types?.category;
+
+            // Skip internal transfers between asset accounts
+            if (
+              accountCategory === "ASSET" ||
+              accountCategory === "LIABILITY"
+            ) {
+              return;
+            }
+
+            // Fixed logic: DEBIT = money coming in (income), CREDIT = money going out (expenses)
+            if (entryType === "DEBIT" && amount > 0) {
+              income += amount; // Money coming in
+            } else if (entryType === "CREDIT" && amount > 0) {
+              expenses += amount; // Money going out
+            }
+          });
+        });
+      }
 
       // Calculate investment totals
       investments?.forEach((investment) => {
@@ -214,6 +272,55 @@ export const useDashboardStats = (userId: string | null) => {
       const netWorth = assets - liabilities;
       const totalBalance = liquidAssets; // Total balance refers to liquid assets
 
+      // Debug: Log comprehensive info for troubleshooting
+      console.log("Dashboard Stats Debug:", {
+        transactionsCount: transactions?.length || 0,
+        accountsCount: accounts?.length || 0,
+        calculatedValues: { income, expenses, assets, liabilities, netWorth },
+        detailedCalculation: {
+          assetsBreakdown: accounts
+            ?.filter((a) => a.account_types?.category === "ASSET")
+            .map((a) => ({
+              name: a.name,
+              balance: accountBalances.get(a.id) || 0,
+            })),
+          liabilitiesBreakdown: accounts
+            ?.filter((a) => a.account_types?.category === "LIABILITY")
+            .map((a) => ({
+              name: a.name,
+              balance: accountBalances.get(a.id) || 0,
+            })),
+          netWorthCalculation: `${assets} - ${liabilities} = ${
+            assets - liabilities
+          }`,
+        },
+        accountsByCategory: accounts?.reduce(
+          (acc: Record<string, number>, account) => {
+            const category = account.account_types?.category || "UNKNOWN";
+            acc[category] = (acc[category] || 0) + 1;
+            return acc;
+          },
+          {} as Record<string, number>
+        ),
+        incomeExpenseEntries:
+          transactions?.flatMap(
+            (t) =>
+              t.transaction_entries
+                ?.filter(
+                  (e) =>
+                    e.accounts?.account_types?.category === "INCOME" ||
+                    e.accounts?.account_types?.category === "EXPENSE"
+                )
+                .map((e) => ({
+                  description: t.description,
+                  account_category: e.accounts?.account_types?.category,
+                  entry_type: e.entry_type,
+                  amount: e.amount,
+                  account_name: e.accounts?.name,
+                })) || []
+          ) || [],
+      });
+
       setStats({
         totalBalance,
         income,
@@ -227,6 +334,7 @@ export const useDashboardStats = (userId: string | null) => {
         bondsAndFDs,
       });
     } catch (error) {
+      console.error("Dashboard stats calculation error:", error);
       setError(
         error instanceof Error
           ? error.message
@@ -241,7 +349,8 @@ export const useDashboardStats = (userId: string | null) => {
     if (userId) {
       calculateStats();
     }
-  }, [userId, calculateStats]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
 
   return {
     stats,

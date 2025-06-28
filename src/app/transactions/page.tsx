@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useAuthStore } from "@/stores/auth";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { TransactionListItem } from "@/components/transactions/TransactionListItem";
@@ -17,7 +17,7 @@ import { Receipt, AlertCircle } from "lucide-react";
 export default function TransactionsPage() {
   const { user, loading, initialize } = useAuthStore();
 
-  // Use the original transactions hook for now (we can integrate pagination later)
+  // Use the original transactions hook
   const {
     transactions,
     loading: transactionsLoading,
@@ -25,18 +25,66 @@ export default function TransactionsPage() {
     fetchAllTransactions,
   } = useTransactions(user?.id || null);
 
-  // Mock pagination state for now
-  const currentPage = 1;
-  const totalPages = Math.ceil(transactions.length / 10);
-  const pageSize = 10;
-  const totalCount = transactions.length;
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
-  // Mock filter states
-  const searchTerm = "";
-  const dateRange = "month" as const;
-  const customDateRange = { start: "", end: "" };
-  const sortBy = "date" as const;
-  const sortOrder = "desc" as const;
+  // Filter states
+  const [searchTerm, setSearchTerm] = useState("");
+  const [dateRange, setDateRange] = useState("month" as const);
+  const [customDateRange, setCustomDateRange] = useState({
+    start: "",
+    end: "",
+  });
+  const [sortBy, setSortBy] = useState("date" as const);
+  const [sortOrder, setSortOrder] = useState("desc" as const);
+
+  // Filter and paginate transactions
+  const filteredAndPaginatedTransactions = useMemo(() => {
+    let filtered = transactions;
+
+    // Apply search filter
+    if (searchTerm.trim()) {
+      const searchTermLower = searchTerm.toLowerCase();
+      filtered = transactions.filter(
+        (transaction) =>
+          transaction.description.toLowerCase().includes(searchTermLower) ||
+          transaction.reference_number
+            ?.toLowerCase()
+            .includes(searchTermLower) ||
+          transaction.notes?.toLowerCase().includes(searchTermLower) ||
+          transaction.transaction_entries?.some((entry) =>
+            entry.accounts?.name?.toLowerCase().includes(searchTermLower)
+          ) ||
+          transaction.transaction_tags?.some((tagEntry) =>
+            tagEntry.tags.name.toLowerCase().includes(searchTermLower)
+          )
+      );
+    }
+
+    // Apply sorting
+    const sorted = [...filtered].sort((a, b) => {
+      if (sortBy === "date") {
+        const dateA = new Date(a.transaction_date).getTime();
+        const dateB = new Date(b.transaction_date).getTime();
+        return sortOrder === "desc" ? dateB - dateA : dateA - dateB;
+      } else if (sortBy === "amount") {
+        const amountA = a.total_amount;
+        const amountB = b.total_amount;
+        return sortOrder === "desc" ? amountB - amountA : amountA - amountB;
+      }
+      return 0;
+    });
+
+    return sorted;
+  }, [transactions, searchTerm, sortBy, sortOrder]);
+
+  const totalCount = filteredAndPaginatedTransactions.length;
+  const totalPages = Math.ceil(totalCount / pageSize);
+  const paginatedTransactions = filteredAndPaginatedTransactions.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
 
   useEffect(() => {
     if (!user && loading) {
@@ -50,40 +98,50 @@ export default function TransactionsPage() {
     }
   }, [user, fetchAllTransactions]);
 
-  // Mock handlers (we'll implement these properly later)
+  // Real handlers for filters and pagination
   const handleSearch = (term: string) => {
-    console.log("Search:", term);
+    setSearchTerm(term);
+    setCurrentPage(1); // Reset to first page when searching
   };
 
   const handleDateRangeChange = (range: string) => {
-    console.log("Date range change:", range);
+    setDateRange(range as "month");
+    setCurrentPage(1); // Reset to first page when filtering
   };
 
   const handleCustomDateRangeChange = (range: {
     start: string;
     end: string;
   }) => {
-    console.log("Custom date range change:", range);
+    setCustomDateRange(range);
+    setCurrentPage(1); // Reset to first page when filtering
   };
 
   const handleSortChange = (by: string, order: string) => {
-    console.log("Sort change:", by, order);
+    setSortBy(by as "date");
+    setSortOrder(order as "desc");
+    setCurrentPage(1); // Reset to first page when sorting
   };
 
   const handlePageChange = (page: number) => {
-    console.log("Page change:", page);
+    setCurrentPage(page);
   };
 
   const handlePageSizeChange = (size: number) => {
-    console.log("Page size change:", size);
+    setPageSize(size);
+    setCurrentPage(1); // Reset to first page when changing page size
   };
 
   const handlePreviousPage = () => {
-    console.log("Previous page");
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
   };
 
   const handleNextPage = () => {
-    console.log("Next page");
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
   };
 
   if (loading) {
@@ -166,15 +224,13 @@ export default function TransactionsPage() {
                 </div>
               ) : (
                 // Transaction items
-                transactions
-                  .slice((currentPage - 1) * pageSize, currentPage * pageSize)
-                  .map((transaction) => (
-                    <TransactionListItem
-                      key={transaction.id}
-                      transaction={transaction}
-                      transactionType={getTransactionType(transaction)}
-                    />
-                  ))
+                paginatedTransactions.map((transaction) => (
+                  <TransactionListItem
+                    key={transaction.id}
+                    transaction={transaction}
+                    transactionType={getTransactionType(transaction)}
+                  />
+                ))
               )}
             </div>
 
@@ -210,7 +266,7 @@ export default function TransactionsPage() {
                   </p>
                   <p className="text-2xl font-semibold text-gray-900">
                     {
-                      transactions.filter(
+                      filteredAndPaginatedTransactions.filter(
                         (t) => getTransactionType(t) === "income"
                       ).length
                     }
@@ -234,7 +290,7 @@ export default function TransactionsPage() {
                   </p>
                   <p className="text-2xl font-semibold text-gray-900">
                     {
-                      transactions.filter(
+                      filteredAndPaginatedTransactions.filter(
                         (t) => getTransactionType(t) === "expense"
                       ).length
                     }
@@ -258,7 +314,7 @@ export default function TransactionsPage() {
                   </p>
                   <p className="text-2xl font-semibold text-gray-900">
                     {
-                      transactions.filter(
+                      filteredAndPaginatedTransactions.filter(
                         (t) => getTransactionType(t) === "transfer"
                       ).length
                     }

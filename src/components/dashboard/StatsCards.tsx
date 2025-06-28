@@ -70,7 +70,7 @@ export const StatsCards = ({
                 Total Balance
               </h3>
               <p className="text-3xl font-bold text-gray-900 mt-1">
-                {formatINR(totalBalance)}
+                {formatINR(Math.abs(totalBalance))}
               </p>
             </div>
           </div>
@@ -82,7 +82,7 @@ export const StatsCards = ({
               <span className="text-sm font-medium">Income</span>
             </div>
             <span className="text-sm font-semibold text-green-600">
-              {formatINR(income)}
+              {formatINR(Math.abs(income))}
             </span>
           </div>
           <div className="flex justify-between items-center mt-2">
@@ -91,7 +91,7 @@ export const StatsCards = ({
               <span className="text-sm font-medium">Expenses</span>
             </div>
             <span className="text-sm font-semibold text-red-600">
-              {formatINR(expenses)}
+              {formatINR(Math.abs(expenses))}
             </span>
           </div>
         </div>
@@ -121,7 +121,7 @@ export const StatsCards = ({
               <span className="text-sm font-medium">Assets</span>
             </div>
             <span className="text-sm font-semibold text-blue-600">
-              {formatINR(assets)}
+              {formatINR(Math.abs(assets))}
             </span>
           </div>
           <div className="flex justify-between items-center mt-2">
@@ -130,7 +130,7 @@ export const StatsCards = ({
               <span className="text-sm font-medium">Liabilities</span>
             </div>
             <span className="text-sm font-semibold text-orange-600">
-              {formatINR(liabilities)}
+              {formatINR(Math.abs(liabilities))}
             </span>
           </div>
         </div>
@@ -148,7 +148,7 @@ export const StatsCards = ({
                 Total Investments
               </h3>
               <p className="text-3xl font-bold text-gray-900 mt-1">
-                {formatINR(totalInvestments)}
+                {formatINR(Math.abs(totalInvestments))}
               </p>
             </div>
           </div>
@@ -157,19 +157,19 @@ export const StatsCards = ({
           <div className="flex justify-between items-center text-sm">
             <span className="text-gray-600">Stocks</span>
             <span className="font-semibold text-gray-900">
-              {formatINR(stocks)}
+              {formatINR(Math.abs(stocks))}
             </span>
           </div>
           <div className="flex justify-between items-center mt-1 text-sm">
             <span className="text-gray-600">Mutual Funds</span>
             <span className="font-semibold text-gray-900">
-              {formatINR(mutualFunds)}
+              {formatINR(Math.abs(mutualFunds))}
             </span>
           </div>
           <div className="flex justify-between items-center mt-1 text-sm">
             <span className="text-gray-600">Bonds & FDs</span>
             <span className="font-semibold text-gray-900">
-              {formatINR(bondsAndFDs)}
+              {formatINR(Math.abs(bondsAndFDs))}
             </span>
           </div>
         </div>

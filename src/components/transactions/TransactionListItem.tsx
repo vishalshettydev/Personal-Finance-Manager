@@ -21,30 +21,30 @@ export const TransactionListItem = ({
   const amount = transaction.total_amount;
 
   // Get debit and credit entries for display
+  // With simplified logic: CREDIT = money deposited/received, DEBIT = money withdrawn/spent
   const debitEntry = transaction.transaction_entries?.find(
-    (entry) => (entry.debit_amount || 0) > 0
+    (entry) => entry.entry_type === "DEBIT"
   );
   const creditEntry = transaction.transaction_entries?.find(
-    (entry) => (entry.credit_amount || 0) > 0
+    (entry) => entry.entry_type === "CREDIT"
   );
 
   // Get account display text based on transaction type
   const getAccountDisplayText = () => {
     if (isTransfer) {
-      // For transfers, show: From Account → To Account
-      // The account that was debited (money taken from) → account that was credited (money added to)
-      const fromAccount = creditEntry?.accounts?.name || "Unknown Account";
-      const toAccount = debitEntry?.accounts?.name || "Unknown Account";
+      // For transfers: From Account (DEBIT = money going out) → To Account (CREDIT = money coming in)
+      const fromAccount = debitEntry?.accounts?.name || "Unknown Account";
+      const toAccount = creditEntry?.accounts?.name || "Unknown Account";
       return `${fromAccount} → ${toAccount}`;
     } else if (isIncome) {
-      // For income, show the income source (credit) and where it went (debit)
-      const incomeSource = creditEntry?.accounts?.name || "Income Source";
-      const destinationAccount = debitEntry?.accounts?.name || "Account";
+      // For income: Income Source → Destination Account (where money was received)
+      const incomeSource = debitEntry?.accounts?.name || "Income Source";
+      const destinationAccount = creditEntry?.accounts?.name || "Account";
       return `${incomeSource} → ${destinationAccount}`;
     } else {
-      // For expense, show where money came from (credit) and what it was spent on (debit)
-      const sourceAccount = creditEntry?.accounts?.name || "Account";
-      const expenseAccount = debitEntry?.accounts?.name || "Expense";
+      // For expense: Source Account (where money came from) → Expense Account
+      const sourceAccount = debitEntry?.accounts?.name || "Account";
+      const expenseAccount = creditEntry?.accounts?.name || "Expense";
       return `${sourceAccount} → ${expenseAccount}`;
     }
   };

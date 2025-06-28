@@ -263,14 +263,18 @@ export function AddTransactionModal({
       const entries = [
         {
           account_id: transactionForm.debit_account_id,
-          debit_amount: amount,
-          credit_amount: 0,
+          quantity: 1,
+          price: amount,
+          entry_type: "DEBIT" as const,
+          amount: amount,
           description: transactionForm.description,
         },
         {
           account_id: transactionForm.credit_account_id,
-          debit_amount: 0,
-          credit_amount: amount,
+          quantity: 1,
+          price: amount,
+          entry_type: "CREDIT" as const,
+          amount: amount,
           description: transactionForm.description,
         },
       ];

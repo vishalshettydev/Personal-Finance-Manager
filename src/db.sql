@@ -2,6 +2,11 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ========================
+-- ENUMS
+-- ========================
+CREATE TYPE entry_type_enum AS ENUM ('BUY', 'SELL', 'DEBIT', 'CREDIT');
+
+-- ========================
 -- ACCOUNT TYPES
 -- ========================
 CREATE TABLE public.account_types (
@@ -104,8 +109,10 @@ CREATE TABLE public.transaction_entries (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   transaction_id UUID REFERENCES public.transactions(id),
   account_id UUID REFERENCES public.accounts(id),
-  debit_amount NUMERIC DEFAULT 0,
-  credit_amount NUMERIC DEFAULT 0,
+  quantity NUMERIC DEFAULT 0,
+  price NUMERIC DEFAULT 0,
+  entry_type entry_type_enum NOT NULL,
+  amount NUMERIC DEFAULT 0,
   description TEXT
 );
 
@@ -127,48 +134,15 @@ CREATE TABLE public.transaction_tags (
 );
 
 -- ========================
--- INVESTMENT MASTER
+-- ACCOUNT PRICES (for historical NAV or share price)
 -- ========================
-CREATE TABLE public.investments (
+CREATE TABLE public.account_prices (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id),
   account_id UUID REFERENCES public.accounts(id),
-  investment_type VARCHAR NOT NULL CHECK (investment_type IN ('MUTUAL_FUND', 'STOCK', 'FD', 'GOLD', 'REAL_ESTATE')),
-  symbol VARCHAR,
-  name VARCHAR NOT NULL,
-  quantity NUMERIC DEFAULT 0,
-  purchase_price NUMERIC,
-  purchase_date DATE,
-  maturity_date DATE,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-
--- ========================
--- INVESTMENT TRANSACTIONS
--- ========================
-CREATE TABLE public.investment_transactions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  investment_id UUID REFERENCES public.investments(id),
-  transaction_type VARCHAR NOT NULL CHECK (transaction_type IN ('BUY', 'SELL')),
-  quantity NUMERIC NOT NULL,
   price NUMERIC NOT NULL,
-  fees NUMERIC DEFAULT 0,
-  transaction_date DATE NOT NULL,
+  date DATE NOT NULL,
   notes TEXT,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
--- ========================
--- INVESTMENT PRICES
--- ========================
-CREATE TABLE public.investment_prices (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES auth.users(id),
-  investment_id UUID REFERENCES public.investments(id),
-  symbol VARCHAR NOT NULL,
-  price NUMERIC NOT NULL,
-  recorded_date DATE NOT NULL,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 

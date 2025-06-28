@@ -55,8 +55,7 @@ export const useDashboardStats = (userId: string | null) => {
 
       if (accountsError) throw accountsError;
 
-      // Calculate income and expenses from transaction entries for the current year
-      const currentYear = new Date().getFullYear();
+      // Calculate income and expenses from ALL transaction entries
       const { data: transactions, error: transactionsError } = await supabase
         .from("transactions")
         .select(
@@ -74,8 +73,7 @@ export const useDashboardStats = (userId: string | null) => {
         `
         )
         .eq("user_id", userId)
-        .gte("transaction_date", `${currentYear}-01-01`)
-        .lte("transaction_date", `${currentYear}-12-31`);
+        .order("transaction_date", { ascending: false });
 
       if (transactionsError) throw transactionsError;
 
@@ -97,16 +95,53 @@ export const useDashboardStats = (userId: string | null) => {
       let mutualFunds = 0;
       let bondsAndFDs = 0;
 
-      // Sum account balances by category
+      // Calculate real account balances from transaction entries
+      const accountBalances = new Map<string, number>();
+
+      // First, calculate balance for each account from transaction entries
+      transactions?.forEach((transaction) => {
+        transaction.transaction_entries?.forEach((entry) => {
+          const accountId = entry.account_id;
+          const category = entry.accounts?.account_types?.category;
+          const debitAmount = entry.debit_amount || 0;
+          const creditAmount = entry.credit_amount || 0;
+
+          if (!accountId || !category) return;
+
+          const currentBalance = accountBalances.get(accountId) || 0;
+          let newBalance = currentBalance;
+
+          // Calculate balance based on account type (normal balance side)
+          switch (category) {
+            case "ASSET":
+            case "EXPENSE":
+              // Assets and Expenses increase with debits, decrease with credits
+              newBalance = currentBalance + debitAmount - creditAmount;
+              break;
+            case "LIABILITY":
+            case "EQUITY":
+            case "INCOME":
+              // Liabilities, Equity, and Income increase with credits, decrease with debits
+              newBalance = currentBalance + creditAmount - debitAmount;
+              break;
+          }
+
+          accountBalances.set(accountId, newBalance);
+        });
+      });
+
+      // Sum balances by category for assets and liabilities
       accounts?.forEach((account) => {
-        const balance = account.balance || 0;
+        const balance = accountBalances.get(account.id) || 0;
         const category = account.account_types?.category;
 
         switch (category) {
           case "ASSET":
+            // Include all asset balances (positive and negative)
             assets += balance;
             break;
           case "LIABILITY":
+            // Include all liability balances (positive and negative)
             liabilities += balance;
             break;
         }
@@ -152,9 +187,32 @@ export const useDashboardStats = (userId: string | null) => {
         }
       });
 
+      // Calculate liquid assets for total balance (bank accounts, cash, etc.)
+      let liquidAssets = 0;
+      accounts?.forEach((account) => {
+        const balance = accountBalances.get(account.id) || 0;
+        const category = account.account_types?.category;
+        const accountType = account.account_types?.name?.toLowerCase() || "";
+        const accountName = account.name.toLowerCase();
+
+        if (category === "ASSET") {
+          // Include bank accounts, cash, and similar liquid assets, exclude property and investments
+          if (
+            accountType.includes("bank") ||
+            accountType.includes("cash") ||
+            accountName.includes("bank") ||
+            accountName.includes("cash") ||
+            accountName.includes("checking") ||
+            accountName.includes("savings")
+          ) {
+            liquidAssets += balance; // Include negative balances too (overdrawn accounts)
+          }
+        }
+      });
+
       // Calculate derived values
       const netWorth = assets - liabilities;
-      const totalBalance = assets; // Total balance typically refers to liquid assets
+      const totalBalance = liquidAssets; // Total balance refers to liquid assets
 
       setStats({
         totalBalance,

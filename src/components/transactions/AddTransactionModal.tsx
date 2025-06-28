@@ -26,6 +26,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { Tag } from "@/lib/types";
 import { AccountingEngine } from "@/lib/accounting";
+import { toast } from "sonner";
 
 interface Account {
   id: string;
@@ -255,7 +256,7 @@ export function AddTransactionModal({
     try {
       const amount = parseFloat(transactionForm.amount);
       if (amount <= 0) {
-        alert("Amount must be greater than 0");
+        toast.error("Amount must be greater than 0");
         return;
       }
 
@@ -281,7 +282,7 @@ export function AddTransactionModal({
 
       // Validate double-entry
       if (!AccountingEngine.validateTransaction(entries)) {
-        alert("Invalid transaction: Debits must equal credits");
+        toast.error("Invalid transaction: Debits must equal credits");
         return;
       }
 
@@ -334,11 +335,12 @@ export function AddTransactionModal({
       resetForm();
       onTransactionAdded();
       onAccountsRefresh();
+      setIsOpen(false);
 
-      alert("Transaction added successfully!");
+      toast.success("Transaction added successfully!");
     } catch (error) {
       console.error("Error creating transaction:", error);
-      alert("Error creating transaction. Please try again.");
+      toast.error("Error creating transaction. Please try again.");
     } finally {
       setIsSubmitting(false);
     }

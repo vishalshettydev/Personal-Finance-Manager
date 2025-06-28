@@ -5,6 +5,7 @@ import { useAuthStore } from "@/stores/auth";
 import { useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { supabase } from "@/lib/supabase";
+import { toast } from "sonner";
 import ChartOfAccounts from "@/components/ChartOfAccounts";
 import { Button } from "@/components/ui/button";
 import {
@@ -515,9 +516,10 @@ export default function Settings() {
         is_placeholder: false,
       });
       setIsAccountModalOpen(false);
+      toast.success("Account created successfully!");
     } catch (error) {
       console.error("Error creating account:", error);
-      alert("Error creating account. Please try again.");
+      toast.error("Error creating account. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -589,9 +591,10 @@ export default function Settings() {
       setEditingAccount(null);
       setIsEditModalOpen(false);
       setHasTransactions(false);
+      toast.success("Account updated successfully!");
     } catch (error) {
       console.error("Error updating account:", error);
-      alert("Error updating account. Please try again.");
+      toast.error("Error updating account. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -621,9 +624,10 @@ export default function Settings() {
         color: "#3B82F6",
       });
       setIsTagModalOpen(false);
+      toast.success("Tag created successfully!");
     } catch (error) {
       console.error("Error creating tag:", error);
-      alert("Error creating tag. Please try again.");
+      toast.error("Error creating tag. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -655,9 +659,10 @@ export default function Settings() {
       });
       setEditingTag(null);
       setIsEditTagModalOpen(false);
+      toast.success("Tag updated successfully!");
     } catch (error) {
       console.error("Error updating tag:", error);
-      alert("Error updating tag. Please try again.");
+      toast.error("Error updating tag. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -673,9 +678,10 @@ export default function Settings() {
 
       // Refresh tags list
       await fetchTags();
+      toast.success("Tag deleted successfully");
     } catch (error) {
       console.error("Error deleting tag:", error);
-      alert("Error deleting tag. Please try again.");
+      toast.error("Error deleting tag. Please try again.");
     }
   };
 

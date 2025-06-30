@@ -16,3 +16,6 @@ export { EnhancedTransactionFilters } from "./transactions/EnhancedTransactionFi
 
 // Dashboard components
 export { StatsCards } from "./dashboard/StatsCards";
+
+// Accounting components
+export { AccountPriceModal } from "./accounting/AccountPriceModal";

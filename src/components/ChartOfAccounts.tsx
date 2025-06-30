@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/auth";
+import { AccountPriceModal } from "./accounting/AccountPriceModal";
 import {
   Building2,
   CreditCard,
@@ -15,6 +16,7 @@ import {
   Expand,
   Minimize2,
   Edit3,
+  DollarSign,
 } from "lucide-react";
 
 // Types
@@ -56,6 +58,7 @@ interface ChartOfAccountsProps {
   maxHeight?: string;
   refreshTrigger?: number; // Optional prop to trigger refresh
   onEditAccount?: (account: Account) => void; // Optional callback for editing accounts
+  onPriceUpdated?: () => void; // Optional callback when prices are updated
 }
 
 export default function ChartOfAccounts({
@@ -64,12 +67,32 @@ export default function ChartOfAccounts({
   maxHeight = "h-[calc(100vh-300px)] sm:h-[calc(100vh-400px)]",
   refreshTrigger,
   onEditAccount,
+  onPriceUpdated,
 }: ChartOfAccountsProps) {
   const { user } = useAuthStore();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [accountsTree, setAccountsTree] = useState<TreeNode[]>([]);
   const [expandedNodes, setExpandedNodes] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Price modal state
+  const [isPriceModalOpen, setIsPriceModalOpen] = useState(false);
+  const [selectedAccountForPrice, setSelectedAccountForPrice] =
+    useState<Account | null>(null);
+
+  // Handle opening price modal
+  const handleEditPrice = (account: Account) => {
+    setSelectedAccountForPrice(account);
+    setIsPriceModalOpen(true);
+  };
+
+  // Handle price update callback
+  const handlePriceUpdated = () => {
+    fetchAccounts();
+    if (onPriceUpdated) {
+      onPriceUpdated();
+    }
+  };
 
   // Function to format currency in Indian Rupees
   const formatINR = (amount: number) => {
@@ -374,22 +397,41 @@ export default function ChartOfAccounts({
             </span>
           )}
 
-          {/* Edit button - only show for user accounts and when onEditAccount is provided */}
-          {onEditAccount && !isSystemAccount && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                // Find the original account data
-                const account = accounts.find((acc) => acc.id === node.id);
-                if (account) {
-                  onEditAccount(account);
-                }
-              }}
-              className="ml-1.5 p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-all duration-200 flex-shrink-0 opacity-0 group-hover:opacity-100"
-              title="Edit Account"
-            >
-              <Edit3 className="h-3 w-3" />
-            </button>
+          {/* Edit buttons - only show for user accounts */}
+          {!isSystemAccount && (
+            <div className="flex items-center gap-0.5 ml-1.5 opacity-0 group-hover:opacity-100">
+              {/* Price edit button */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const account = accounts.find((acc) => acc.id === node.id);
+                  if (account) {
+                    handleEditPrice(account);
+                  }
+                }}
+                className="p-1 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-all duration-200 flex-shrink-0"
+                title="Edit Price"
+              >
+                <DollarSign className="h-3 w-3" />
+              </button>
+
+              {/* Account edit button - only show when onEditAccount is provided */}
+              {onEditAccount && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const account = accounts.find((acc) => acc.id === node.id);
+                    if (account) {
+                      onEditAccount(account);
+                    }
+                  }}
+                  className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-all duration-200 flex-shrink-0"
+                  title="Edit Account"
+                >
+                  <Edit3 className="h-3 w-3" />
+                </button>
+              )}
+            </div>
           )}
         </div>
 
@@ -496,6 +538,14 @@ export default function ChartOfAccounts({
           </div>
         )}
       </div>
+
+      {/* Account Price Modal */}
+      <AccountPriceModal
+        isOpen={isPriceModalOpen}
+        onOpenChange={setIsPriceModalOpen}
+        account={selectedAccountForPrice}
+        onPriceUpdated={handlePriceUpdated}
+      />
     </div>
   );
 }

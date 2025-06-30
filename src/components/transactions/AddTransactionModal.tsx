@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -13,16 +12,15 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import {
   Plus,
   Receipt,
-  AlertCircle,
   Search,
   X,
-  ChevronDown,
-  ChevronRight,
+  TrendingUp,
+  ArrowRightLeft,
 } from "lucide-react";
+import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { supabase } from "@/lib/supabase";
 import { Tag } from "@/lib/types";
 import { AccountingEngine } from "@/lib/accounting";
@@ -42,17 +40,14 @@ interface Account {
   };
 }
 
-interface HierarchicalAccount extends Account {
-  level: number;
-  isSelectable: boolean;
-  hasChildren: boolean;
-  children: HierarchicalAccount[];
-}
-
 interface TransactionFormData {
   description: string;
   reference_number: string;
   transaction_date: string;
+  transaction_type: "investment" | "regular";
+  investment_type: "buy" | "sell";
+  quantity: string;
+  price: string;
   amount: string;
   notes: string;
   debit_account_id: string;
@@ -85,6 +80,10 @@ export function AddTransactionModal({
     description: "",
     reference_number: "",
     transaction_date: new Date().toISOString().split("T")[0],
+    transaction_type: "regular",
+    investment_type: "buy",
+    quantity: "1",
+    price: "",
     amount: "",
     notes: "",
     debit_account_id: "",
@@ -92,14 +91,12 @@ export function AddTransactionModal({
     selected_tags: [],
   });
 
-  // UI states for dropdowns
+  // UI states for dropdowns and search
   const [tagSearchTerm, setTagSearchTerm] = useState("");
-  const [expandedFromAccounts, setExpandedFromAccounts] = useState<Set<string>>(
-    new Set()
-  );
-  const [expandedToAccounts, setExpandedToAccounts] = useState<Set<string>>(
-    new Set()
-  );
+  const [fromAccountSearch, setFromAccountSearch] = useState("");
+  const [toAccountSearch, setToAccountSearch] = useState("");
+  const [showFromDropdown, setShowFromDropdown] = useState(false);
+  const [showToDropdown, setShowToDropdown] = useState(false);
 
   // Create a new tag instantly
   const createTagInstantly = async (tagName: string): Promise<Tag | null> => {
@@ -143,53 +140,135 @@ export function AddTransactionModal({
     }
   };
 
-  // Build hierarchical account list
-  const buildAccountHierarchy = (
-    accountsList: Account[],
-    parentId: string | null = null,
-    level = 0
-  ): HierarchicalAccount[] => {
-    const result: HierarchicalAccount[] = [];
-    const children = accountsList.filter((acc) => acc.parent_id === parentId);
+  // Build account path for display
+  const getAccountPath = (accountId: string): string => {
+    const account = accounts.find((acc) => acc.id === accountId);
+    if (!account) return "";
 
-    for (const child of children) {
-      const childAccounts = accountsList.filter(
-        (acc) => acc.parent_id === child.id
+    const buildPath = (acc: Account): string => {
+      if (!acc.parent_id) return acc.name;
+      const parent = accounts.find((p) => p.id === acc.parent_id);
+      return parent ? `${buildPath(parent)}/${acc.name}` : acc.name;
+    };
+
+    return buildPath(account);
+  };
+
+  // Check if account is investment type (mutual fund or stock)
+  const isInvestmentAccount = (account: Account): boolean => {
+    return (
+      account.account_types.name.toLowerCase() === "mutual fund" ||
+      account.account_types.name.toLowerCase() === "stock"
+    );
+  };
+
+  // Search accounts by name and path with investment filtering
+  const searchAccounts = (
+    searchTerm: string,
+    excludeId?: string,
+    isFromAccount: boolean = false
+  ): Account[] => {
+    if (!searchTerm) return [];
+
+    let filteredAccounts = accounts.filter(
+      (acc) =>
+        !acc.is_placeholder &&
+        acc.id !== excludeId &&
+        (acc.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          getAccountPath(acc.id)
+            .toLowerCase()
+            .includes(searchTerm.toLowerCase()))
+    );
+
+    // Apply transaction type filtering
+    if (transactionForm.transaction_type === "investment") {
+      if (isFromAccount) {
+        if (transactionForm.investment_type === "buy") {
+          // For buy: exclude investment accounts from "from" account
+          filteredAccounts = filteredAccounts.filter(
+            (acc) => !isInvestmentAccount(acc)
+          );
+        } else {
+          // For sell: only show investment accounts in "from" account
+          filteredAccounts = filteredAccounts.filter((acc) =>
+            isInvestmentAccount(acc)
+          );
+        }
+      } else {
+        // To account
+        if (transactionForm.investment_type === "buy") {
+          // For buy: only show investment accounts in "to" account
+          filteredAccounts = filteredAccounts.filter((acc) =>
+            isInvestmentAccount(acc)
+          );
+        } else {
+          // For sell: exclude investment accounts from "to" account
+          filteredAccounts = filteredAccounts.filter(
+            (acc) => !isInvestmentAccount(acc)
+          );
+        }
+      }
+    } else if (transactionForm.transaction_type === "regular") {
+      // For regular transactions: exclude investment accounts from both from and to accounts
+      filteredAccounts = filteredAccounts.filter(
+        (acc) => !isInvestmentAccount(acc)
       );
-      result.push({
-        ...child,
-        level: level,
-        isSelectable: !child.is_placeholder,
-        hasChildren: childAccounts.length > 0,
-        children:
-          childAccounts.length > 0
-            ? buildAccountHierarchy(accountsList, child.id, level + 1)
-            : [],
-      });
     }
 
-    return result;
+    return filteredAccounts.slice(0, 10); // Limit to 10 results
   };
 
-  // Toggle expand/collapse for account trees
-  const toggleFromAccountExpand = (accountId: string) => {
-    const newExpanded = new Set(expandedFromAccounts);
-    if (newExpanded.has(accountId)) {
-      newExpanded.delete(accountId);
-    } else {
-      newExpanded.add(accountId);
+  // Update account price in account_prices table
+  const updateAccountPrice = async (accountId: string, price: number) => {
+    try {
+      const { data: existingPrice, error: fetchError } = await supabase
+        .from("account_prices")
+        .select("*")
+        .eq("account_id", accountId)
+        .eq("date", transactionForm.transaction_date)
+        .single();
+
+      if (fetchError && fetchError.code !== "PGRST116") {
+        // PGRST116 is "no rows returned" which is expected when no price exists
+        throw fetchError;
+      }
+
+      if (existingPrice) {
+        // Update existing price
+        const { error: updateError } = await supabase
+          .from("account_prices")
+          .update({ price })
+          .eq("account_id", accountId)
+          .eq("date", transactionForm.transaction_date);
+
+        if (updateError) throw updateError;
+      } else {
+        // Insert new price
+        const { error: insertError } = await supabase
+          .from("account_prices")
+          .insert({
+            account_id: accountId,
+            price,
+            date: transactionForm.transaction_date,
+          });
+
+        if (insertError) throw insertError;
+      }
+    } catch (error) {
+      console.error("Error updating account price:", error);
+      // Don't throw here to avoid blocking the main transaction
+      toast.error("Warning: Could not update account price");
     }
-    setExpandedFromAccounts(newExpanded);
   };
 
-  const toggleToAccountExpand = (accountId: string) => {
-    const newExpanded = new Set(expandedToAccounts);
-    if (newExpanded.has(accountId)) {
-      newExpanded.delete(accountId);
-    } else {
-      newExpanded.add(accountId);
+  // Calculate amount for investment transactions
+  const calculateAmount = (newQuantity?: string, newPrice?: string) => {
+    if (transactionForm.transaction_type === "investment") {
+      const quantity = parseFloat(newQuantity ?? transactionForm.quantity) || 0;
+      const price = parseFloat(newPrice ?? transactionForm.price) || 0;
+      const amount = quantity * price;
+      setTransactionForm((prev) => ({ ...prev, amount: amount.toString() }));
     }
-    setExpandedToAccounts(newExpanded);
   };
 
   // Handle tag selection
@@ -238,6 +317,10 @@ export function AddTransactionModal({
       description: "",
       reference_number: "",
       transaction_date: new Date().toISOString().split("T")[0],
+      transaction_type: "regular",
+      investment_type: "buy",
+      quantity: "1",
+      price: "",
       amount: "",
       notes: "",
       debit_account_id: "",
@@ -245,8 +328,10 @@ export function AddTransactionModal({
       selected_tags: [],
     });
     setTagSearchTerm("");
-    setExpandedFromAccounts(new Set());
-    setExpandedToAccounts(new Set());
+    setFromAccountSearch("");
+    setToAccountSearch("");
+    setShowFromDropdown(false);
+    setShowToDropdown(false);
   };
 
   const handleTransactionSubmit = async (e: React.FormEvent) => {
@@ -260,21 +345,46 @@ export function AddTransactionModal({
         return;
       }
 
+      // For investments, validate quantity and price
+      if (transactionForm.transaction_type === "investment") {
+        const quantity = parseFloat(transactionForm.quantity);
+        const price = parseFloat(transactionForm.price);
+        if (quantity <= 0 || price <= 0) {
+          toast.error(
+            "Quantity and price must be greater than 0 for investments"
+          );
+          return;
+        }
+      }
+
+      const quantity =
+        transactionForm.transaction_type === "investment"
+          ? parseFloat(transactionForm.quantity)
+          : 1;
+      const price =
+        transactionForm.transaction_type === "investment"
+          ? parseFloat(transactionForm.price)
+          : amount;
+
       // Create transaction entries for double-entry
+      // From Account = DEBIT (money going out)
+      // To Account = CREDIT (money coming in)
       const entries = [
         {
-          account_id: transactionForm.debit_account_id,
-          quantity: 1,
+          account_id: transactionForm.debit_account_id, // From Account
+          quantity: transactionForm.transaction_type === "investment" ? 1 : 1,
           price: amount,
-          entry_type: "DEBIT" as const,
+          entry_type: "DEBIT" as "BUY" | "SELL" | "DEBIT" | "CREDIT",
           amount: amount,
           description: transactionForm.description,
         },
         {
-          account_id: transactionForm.credit_account_id,
-          quantity: 1,
-          price: amount,
-          entry_type: "CREDIT" as const,
+          account_id: transactionForm.credit_account_id, // To Account
+          quantity:
+            transactionForm.transaction_type === "investment" ? quantity : 1,
+          price:
+            transactionForm.transaction_type === "investment" ? price : amount,
+          entry_type: "CREDIT" as "BUY" | "SELL" | "DEBIT" | "CREDIT",
           amount: amount,
           description: transactionForm.description,
         },
@@ -331,6 +441,24 @@ export function AddTransactionModal({
       // Update account balances
       await AccountingEngine.updateAccountBalances(entriesWithTransactionId);
 
+      // Update account price for investment transactions
+      if (transactionForm.transaction_type === "investment") {
+        const priceValue = parseFloat(transactionForm.price);
+        if (transactionForm.investment_type === "buy") {
+          // For buy transactions, update price for the "to" account (investment account)
+          await updateAccountPrice(
+            transactionForm.credit_account_id,
+            priceValue
+          );
+        } else {
+          // For sell transactions, update price for the "from" account (investment account)
+          await updateAccountPrice(
+            transactionForm.debit_account_id,
+            priceValue
+          );
+        }
+      }
+
       // Reset form and refresh data
       resetForm();
       onTransactionAdded();
@@ -346,104 +474,6 @@ export function AddTransactionModal({
     }
   };
 
-  // Render account tree
-  const renderAccountTree = (
-    account: HierarchicalAccount,
-    isFromTree: boolean
-  ): React.ReactNode => {
-    const isSelected = isFromTree
-      ? transactionForm.debit_account_id === account.id
-      : transactionForm.credit_account_id === account.id;
-
-    const canSelect = isFromTree
-      ? !account.is_placeholder
-      : !account.is_placeholder &&
-        account.id !== transactionForm.debit_account_id;
-
-    const isFromAccount =
-      !isFromTree && account.id === transactionForm.debit_account_id;
-    const expandedSet = isFromTree ? expandedFromAccounts : expandedToAccounts;
-    const toggleExpand = isFromTree
-      ? toggleFromAccountExpand
-      : toggleToAccountExpand;
-    const isExpanded = expandedSet.has(account.id);
-
-    return (
-      <div key={account.id}>
-        <div
-          className={`flex items-center py-1 px-1 rounded text-sm transition-colors ${
-            isFromAccount
-              ? "opacity-50 cursor-not-allowed"
-              : isSelected
-              ? "bg-blue-100 border border-blue-300"
-              : canSelect
-              ? "hover:bg-gray-100 cursor-pointer"
-              : "cursor-default"
-          }`}
-          style={{
-            paddingLeft: `${4 + account.level * 16}px`,
-          }}
-        >
-          {account.hasChildren && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleExpand(account.id);
-              }}
-              className="mr-1 p-0.5 hover:bg-gray-200 rounded"
-              disabled={isFromAccount}
-            >
-              {isExpanded ? (
-                <ChevronDown className="h-3 w-3" />
-              ) : (
-                <ChevronRight className="h-3 w-3" />
-              )}
-            </button>
-          )}
-          {!account.hasChildren && <span className="w-4 mr-1"></span>}
-          <span
-            className={`flex-1 ${
-              isFromAccount
-                ? "text-gray-400"
-                : account.is_placeholder
-                ? "text-gray-600 font-medium"
-                : isSelected
-                ? "text-blue-700 font-medium"
-                : "text-gray-900"
-            }`}
-            onClick={() => {
-              if (canSelect && !isFromAccount) {
-                if (isFromTree) {
-                  setTransactionForm({
-                    ...transactionForm,
-                    debit_account_id: account.id,
-                    credit_account_id: "",
-                  });
-                } else {
-                  setTransactionForm({
-                    ...transactionForm,
-                    credit_account_id: account.id,
-                  });
-                }
-              }
-            }}
-          >
-            {account.name}
-          </span>
-          {isSelected && <span className="text-blue-600 text-xs">✓</span>}
-        </div>
-        {account.hasChildren && isExpanded && (
-          <div>
-            {account.children.map((child) =>
-              renderAccountTree(child, isFromTree)
-            )}
-          </div>
-        )}
-      </div>
-    );
-  };
-
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
@@ -452,99 +482,220 @@ export function AddTransactionModal({
           <span>Add Transaction</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-semibold flex items-center gap-2">
-            <Receipt className="h-5 w-5 text-blue-600" />
-            Add New Transaction
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+        <DialogHeader className="pb-3">
+          <DialogTitle className="text-lg font-semibold flex items-center gap-2">
+            <Receipt className="h-4 w-4 text-blue-600" />
+            Add Transaction
           </DialogTitle>
-          <DialogDescription className="text-sm text-gray-600">
-            Record a new transaction by specifying where money is coming from
-            and where it&rsquo;s going.
-          </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleTransactionSubmit} className="space-y-6">
-          {/* Basic Information Section */}
-          <div className="space-y-4">
-            <h3 className="text-sm font-medium text-gray-900 border-b pb-2">
-              Transaction Details
-            </h3>
+        <form onSubmit={handleTransactionSubmit} className="space-y-4">
+          {/* Transaction Type */}
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant={
+                transactionForm.transaction_type === "regular"
+                  ? "default"
+                  : "outline"
+              }
+              size="sm"
+              onClick={() => {
+                setTransactionForm({
+                  ...transactionForm,
+                  transaction_type: "regular",
+                  debit_account_id: "",
+                  credit_account_id: "",
+                });
+                setFromAccountSearch("");
+                setToAccountSearch("");
+                setShowFromDropdown(false);
+                setShowToDropdown(false);
+              }}
+              className="flex-1 h-8"
+            >
+              <ArrowRightLeft className="w-3 h-3 mr-1" />
+              Regular
+            </Button>
+            <Button
+              type="button"
+              variant={
+                transactionForm.transaction_type === "investment"
+                  ? "default"
+                  : "outline"
+              }
+              size="sm"
+              onClick={() => {
+                setTransactionForm({
+                  ...transactionForm,
+                  transaction_type: "investment",
+                  debit_account_id: "",
+                  credit_account_id: "",
+                });
+                setFromAccountSearch("");
+                setToAccountSearch("");
+                setShowFromDropdown(false);
+                setShowToDropdown(false);
+              }}
+              className="flex-1 h-8"
+            >
+              <TrendingUp className="w-3 h-3 mr-1" />
+              Investment
+            </Button>
+          </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="description" className="text-sm font-medium">
-                  Description *
-                </Label>
-                <Input
-                  id="description"
-                  value={transactionForm.description}
-                  onChange={(e) =>
-                    setTransactionForm({
-                      ...transactionForm,
-                      description: e.target.value,
-                    })
-                  }
-                  placeholder="e.g., Office supplies purchase"
-                  className="h-10"
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label
-                  htmlFor="reference_number"
-                  className="text-sm font-medium"
-                >
-                  Reference Number
-                </Label>
-                <Input
-                  id="reference_number"
-                  value={transactionForm.reference_number}
-                  onChange={(e) =>
-                    setTransactionForm({
-                      ...transactionForm,
-                      reference_number: e.target.value,
-                    })
-                  }
-                  placeholder="e.g., INV-001, CHQ-123"
-                  className="h-10"
-                />
-              </div>
+          {/* Investment Type (Buy/Sell) - Only show when Investment is selected */}
+          {transactionForm.transaction_type === "investment" && (
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant={
+                  transactionForm.investment_type === "buy"
+                    ? "default"
+                    : "outline"
+                }
+                size="sm"
+                onClick={() => {
+                  setTransactionForm({
+                    ...transactionForm,
+                    investment_type: "buy",
+                    debit_account_id: "",
+                    credit_account_id: "",
+                  });
+                  setFromAccountSearch("");
+                  setToAccountSearch("");
+                  setShowFromDropdown(false);
+                  setShowToDropdown(false);
+                }}
+                className="flex-1 h-8"
+              >
+                Buy
+              </Button>
+              <Button
+                type="button"
+                variant={
+                  transactionForm.investment_type === "sell"
+                    ? "default"
+                    : "outline"
+                }
+                size="sm"
+                onClick={() => {
+                  setTransactionForm({
+                    ...transactionForm,
+                    investment_type: "sell",
+                    debit_account_id: "",
+                    credit_account_id: "",
+                  });
+                  setFromAccountSearch("");
+                  setToAccountSearch("");
+                  setShowFromDropdown(false);
+                  setShowToDropdown(false);
+                }}
+                className="flex-1 h-8"
+              >
+                Sell
+              </Button>
             </div>
+          )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label
-                  htmlFor="transaction_date"
-                  className="text-sm font-medium"
-                >
-                  Transaction Date *
+          {/* Basic Fields */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="description" className="text-sm">
+                Description *
+              </Label>
+              <Input
+                id="description"
+                value={transactionForm.description}
+                onChange={(e) =>
+                  setTransactionForm({
+                    ...transactionForm,
+                    description: e.target.value,
+                  })
+                }
+                placeholder="Transaction description"
+                className="h-9"
+                required
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="transaction_date" className="text-sm">
+                Date *
+              </Label>
+              <Input
+                id="transaction_date"
+                type="date"
+                value={transactionForm.transaction_date}
+                onChange={(e) =>
+                  setTransactionForm({
+                    ...transactionForm,
+                    transaction_date: e.target.value,
+                  })
+                }
+                className="h-9"
+                required
+              />
+            </div>
+          </div>
+
+          {/* Investment Fields */}
+          {transactionForm.transaction_type === "investment" ? (
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="quantity" className="text-sm">
+                  Quantity *
                 </Label>
                 <Input
-                  id="transaction_date"
-                  type="date"
-                  value={transactionForm.transaction_date}
-                  onChange={(e) =>
+                  id="quantity"
+                  type="number"
+                  step="0.001"
+                  min="0.001"
+                  value={transactionForm.quantity}
+                  onChange={(e) => {
+                    const newQuantity = e.target.value;
                     setTransactionForm({
                       ...transactionForm,
-                      transaction_date: e.target.value,
-                    })
-                  }
-                  className="h-10"
+                      quantity: newQuantity,
+                    });
+                    calculateAmount(newQuantity, transactionForm.price);
+                  }}
+                  placeholder="1"
+                  className="h-9"
                   required
                 />
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="amount" className="text-sm font-medium">
-                  Amount (₹) *
+              <div className="space-y-1">
+                <Label htmlFor="price" className="text-sm">
+                  Price (₹) *
+                </Label>
+                <Input
+                  id="price"
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  value={transactionForm.price}
+                  onChange={(e) => {
+                    const newPrice = e.target.value;
+                    setTransactionForm({
+                      ...transactionForm,
+                      price: newPrice,
+                    });
+                    calculateAmount(transactionForm.quantity, newPrice);
+                  }}
+                  placeholder="0.00"
+                  className="h-9"
+                  required
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="amount" className="text-sm">
+                  Amount (₹)
                 </Label>
                 <Input
                   id="amount"
                   type="number"
                   step="0.01"
-                  min="0.01"
                   value={transactionForm.amount}
                   onChange={(e) =>
                     setTransactionForm({
@@ -553,78 +704,187 @@ export function AddTransactionModal({
                     })
                   }
                   placeholder="0.00"
-                  className="h-10"
-                  required
+                  className="h-9 bg-gray-50"
+                  readOnly
                 />
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="space-y-1">
+              <Label htmlFor="amount" className="text-sm">
+                Amount (₹) *
+              </Label>
+              <Input
+                id="amount"
+                type="number"
+                step="0.01"
+                min="0.01"
+                value={transactionForm.amount}
+                onChange={(e) =>
+                  setTransactionForm({
+                    ...transactionForm,
+                    amount: e.target.value,
+                  })
+                }
+                placeholder="0.00"
+                className="h-9"
+                required
+              />
+            </div>
+          )}
 
           {/* Account Selection */}
-          <div className="space-y-4">
-            <h3 className="text-sm font-medium text-gray-900 border-b pb-2">
-              Account Selection
-            </h3>
-
-            <div className="bg-blue-50 p-3 rounded-lg">
-              <div className="flex items-center">
-                <AlertCircle className="h-4 w-4 text-blue-600 mr-2" />
-                <p className="text-sm text-blue-700">
-                  Select where the money is coming from and where it&rsquo;s
-                  going to.
-                </p>
+          <div className="grid grid-cols-2 gap-3">
+            {/* From Account */}
+            <div className="space-y-1 relative">
+              <Label className="text-sm">From Account *</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
+                <Input
+                  value={fromAccountSearch}
+                  onChange={(e) => {
+                    setFromAccountSearch(e.target.value);
+                    setShowFromDropdown(e.target.value.length > 0);
+                  }}
+                  onFocus={() =>
+                    setShowFromDropdown(fromAccountSearch.length > 0)
+                  }
+                  placeholder="Search accounts..."
+                  className="pl-9 h-9"
+                />
               </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* From Account Tree */}
-              <div className="space-y-3">
-                <Label className="text-sm font-medium">From Account *</Label>
-                <div className="border rounded-lg p-2 bg-gray-50 max-h-64 overflow-y-auto">
-                  <div className="space-y-0.5">
-                    {buildAccountHierarchy(accounts).map((account) =>
-                      renderAccountTree(account, true)
-                    )}
-                  </div>
+              {transactionForm.debit_account_id && (
+                <div className="text-xs text-gray-600 mt-1">
+                  {getAccountPath(transactionForm.debit_account_id)}
                 </div>
-              </div>
-
-              {/* To Account Tree */}
-              <div className="space-y-3">
-                <Label className="text-sm font-medium">To Account *</Label>
-                <div
-                  className={`border rounded-lg p-2 max-h-64 overflow-y-auto ${
-                    !transactionForm.debit_account_id
-                      ? "bg-gray-50 opacity-50"
-                      : "bg-white"
-                  }`}
-                >
-                  {!transactionForm.debit_account_id ? (
-                    <div className="text-center text-gray-500 py-8">
-                      Select from account first
-                    </div>
-                  ) : (
-                    <div className="space-y-0.5">
-                      {buildAccountHierarchy(accounts).map((account) =>
-                        renderAccountTree(account, false)
-                      )}
+              )}
+              {showFromDropdown && (
+                <div className="absolute top-full left-0 right-0 z-10 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                  {searchAccounts(fromAccountSearch, undefined, true).map(
+                    (account) => (
+                      <button
+                        key={account.id}
+                        type="button"
+                        onClick={() => {
+                          setTransactionForm({
+                            ...transactionForm,
+                            debit_account_id: account.id,
+                            credit_account_id: "",
+                          });
+                          setFromAccountSearch(account.name);
+                          setShowFromDropdown(false);
+                          setToAccountSearch("");
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b last:border-b-0"
+                      >
+                        <div className="font-medium text-sm">
+                          {account.name}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {getAccountPath(account.id)}
+                        </div>
+                      </button>
+                    )
+                  )}
+                  {searchAccounts(fromAccountSearch, undefined, true).length ===
+                    0 && (
+                    <div className="text-center text-gray-500 py-3 text-sm">
+                      No accounts found
                     </div>
                   )}
                 </div>
+              )}
+            </div>
+
+            {/* To Account */}
+            <div className="space-y-1 relative">
+              <Label className="text-sm">To Account *</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
+                <Input
+                  value={toAccountSearch}
+                  onChange={(e) => {
+                    setToAccountSearch(e.target.value);
+                    setShowToDropdown(e.target.value.length > 0);
+                  }}
+                  onFocus={() => setShowToDropdown(toAccountSearch.length > 0)}
+                  placeholder="Search accounts..."
+                  className="pl-9 h-9"
+                  disabled={!transactionForm.debit_account_id}
+                />
               </div>
+              {transactionForm.credit_account_id && (
+                <div className="text-xs text-gray-600 mt-1">
+                  {getAccountPath(transactionForm.credit_account_id)}
+                </div>
+              )}
+              {showToDropdown && transactionForm.debit_account_id && (
+                <div className="absolute top-full left-0 right-0 z-10 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                  {searchAccounts(
+                    toAccountSearch,
+                    transactionForm.debit_account_id,
+                    false
+                  ).map((account) => (
+                    <button
+                      key={account.id}
+                      type="button"
+                      onClick={() => {
+                        setTransactionForm({
+                          ...transactionForm,
+                          credit_account_id: account.id,
+                        });
+                        setToAccountSearch(account.name);
+                        setShowToDropdown(false);
+                      }}
+                      className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b last:border-b-0"
+                    >
+                      <div className="font-medium text-sm">{account.name}</div>
+                      <div className="text-xs text-gray-500">
+                        {getAccountPath(account.id)}
+                      </div>
+                    </button>
+                  ))}
+                  {searchAccounts(
+                    toAccountSearch,
+                    transactionForm.debit_account_id,
+                    false
+                  ).length === 0 && (
+                    <div className="text-center text-gray-500 py-3 text-sm">
+                      No accounts found
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Tags Section */}
-          <div className="space-y-4">
-            <h3 className="text-sm font-medium text-gray-900 border-b pb-2">
-              Tags (Optional)
-            </h3>
-
-            <div className="space-y-3">
+          {/* Optional Fields */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="reference_number" className="text-sm">
+                Reference
+              </Label>
+              <Input
+                id="reference_number"
+                value={transactionForm.reference_number}
+                onChange={(e) =>
+                  setTransactionForm({
+                    ...transactionForm,
+                    reference_number: e.target.value,
+                  })
+                }
+                placeholder="Reference number"
+                className="h-9"
+              />
+            </div>
+            <div className="space-y-1 relative">
+              <Label htmlFor="tags" className="text-sm">
+                Tags
+              </Label>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
                 <Input
+                  id="tags"
                   value={tagSearchTerm}
                   onChange={(e) => setTagSearchTerm(e.target.value)}
                   onKeyDown={(e) => {
@@ -638,27 +898,19 @@ export function AddTransactionModal({
                       }
                     }
                   }}
-                  placeholder="Search tags or type to create new..."
-                  className="pl-10 h-10"
+                  placeholder="Search tags..."
+                  className="pl-9 h-9"
                 />
               </div>
-
-              {/* Tag suggestions */}
               {tagSearchTerm && (
-                <div className="border rounded-md max-h-32 overflow-y-auto">
+                <div className="absolute z-10 bg-white border rounded-md shadow-lg max-h-32 overflow-y-auto mt-1 w-full">
                   {getFilteredTags().map((tag) => (
                     <button
                       key={tag.id}
                       type="button"
                       onClick={() => handleTagSelect(tag)}
-                      className="w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center gap-2"
+                      className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b last:border-b-0 text-sm"
                     >
-                      <div
-                        className="w-3 h-3 rounded-full"
-                        style={{
-                          backgroundColor: tag.color || "#3B82F6",
-                        }}
-                      />
                       {tag.name}
                     </button>
                   ))}
@@ -666,50 +918,40 @@ export function AddTransactionModal({
                     <button
                       type="button"
                       onClick={handleTagCreate}
-                      className="w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center gap-2 text-blue-600"
+                      className="w-full text-left px-3 py-2 hover:bg-gray-50 bg-blue-50 text-blue-600 text-sm"
                     >
-                      <Plus className="w-3 h-3" />
                       Create &quot;{tagSearchTerm}&quot;
                     </button>
                   )}
                 </div>
               )}
-
-              {/* Selected tags */}
-              {transactionForm.selected_tags.length > 0 && (
-                <div className="flex flex-wrap gap-1">
-                  {transactionForm.selected_tags.map((tag) => (
-                    <Badge
-                      key={tag.id}
-                      variant="secondary"
-                      className="flex items-center gap-1 px-1.5 py-0.5 text-xs h-6"
-                      style={{
-                        backgroundColor: `${tag.color}20`,
-                        color: tag.color || undefined,
-                      }}
-                    >
-                      <div
-                        className="w-1.5 h-1.5 rounded-full"
-                        style={{ backgroundColor: tag.color || "#3B82F6" }}
-                      />
-                      {tag.name}
-                      <button
-                        type="button"
-                        onClick={() => handleTagRemove(tag.id)}
-                        className="ml-0.5 hover:bg-gray-200 rounded-full p-0.5"
-                      >
-                        <X className="w-2.5 h-2.5" />
-                      </button>
-                    </Badge>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
 
-          {/* Notes Section */}
-          <div className="space-y-2">
-            <Label htmlFor="notes" className="text-sm font-medium">
+          {/* Selected Tags */}
+          {transactionForm.selected_tags.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {transactionForm.selected_tags.map((tag) => (
+                <span
+                  key={tag.id}
+                  className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs"
+                >
+                  {tag.name}
+                  <button
+                    type="button"
+                    onClick={() => handleTagRemove(tag.id)}
+                    className="hover:bg-blue-200 rounded-full p-0.5"
+                  >
+                    <X className="h-2 w-2" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Notes */}
+          <div className="space-y-1">
+            <Label htmlFor="notes" className="text-sm">
               Notes
             </Label>
             <Textarea
@@ -721,12 +963,13 @@ export function AddTransactionModal({
                   notes: e.target.value,
                 })
               }
-              placeholder="Additional notes about this transaction..."
-              className="min-h-[80px]"
+              placeholder="Additional notes..."
+              className="min-h-[60px] resize-none text-sm"
             />
           </div>
 
-          <div className="flex justify-end space-x-3 pt-6 border-t">
+          {/* Form Actions */}
+          <div className="flex justify-end gap-2 pt-2">
             <Button
               type="button"
               variant="outline"
@@ -735,22 +978,30 @@ export function AddTransactionModal({
                 resetForm();
               }}
               disabled={isSubmitting}
-              className="px-6"
+              size="sm"
             >
               Cancel
             </Button>
             <Button
               type="submit"
-              disabled={isSubmitting}
-              className="px-6 bg-blue-600 hover:bg-blue-700"
+              disabled={
+                isSubmitting ||
+                !transactionForm.description ||
+                !transactionForm.amount ||
+                !transactionForm.debit_account_id ||
+                !transactionForm.credit_account_id ||
+                (transactionForm.transaction_type === "investment" &&
+                  (!transactionForm.quantity || !transactionForm.price))
+              }
+              size="sm"
             >
               {isSubmitting ? (
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  Creating...
-                </div>
+                <>
+                  <LoadingSpinner size="sm" className="mr-1" />
+                  Adding...
+                </>
               ) : (
-                "Add Transaction"
+                "Add"
               )}
             </Button>
           </div>

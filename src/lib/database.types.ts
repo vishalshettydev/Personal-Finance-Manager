@@ -87,6 +87,44 @@ export type Database = {
           }
         ];
       };
+      account_prices: {
+        Row: {
+          id: string;
+          user_id: string | null;
+          account_id: string;
+          price: number;
+          date: string;
+          notes: string | null;
+          created_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string | null;
+          account_id: string;
+          price: number;
+          date: string;
+          notes?: string | null;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string | null;
+          account_id?: string;
+          price?: number;
+          date?: string;
+          notes?: string | null;
+          created_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "account_prices_account_id_fkey";
+            columns: ["account_id"];
+            isOneToOne: false;
+            referencedRelation: "accounts";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       budget_categories: {
         Row: {
           account_id: string | null;

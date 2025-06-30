@@ -776,310 +776,254 @@ export default function Settings() {
                       Add Account
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-                    <DialogHeader className="pb-4">
-                      <DialogTitle className="text-xl font-semibold flex items-center gap-2">
-                        <Plus className="h-5 w-5 text-green-600" />
-                        Add New Account
+                  <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+                    <DialogHeader className="pb-3">
+                      <DialogTitle className="text-lg font-semibold flex items-center gap-2">
+                        <Plus className="h-4 w-4 text-green-600" />
+                        Add Account
                       </DialogTitle>
-                      <DialogDescription className="text-sm text-gray-600">
-                        Create a new account in your chart of accounts. This
-                        will be used for tracking transactions and balances.
-                      </DialogDescription>
                     </DialogHeader>
 
-                    <form onSubmit={handleAccountSubmit} className="space-y-6">
-                      {/* Basic Information Section */}
-                      <div className="space-y-4">
-                        <h3 className="text-sm font-medium text-gray-900 border-b pb-2">
-                          Basic Information
-                        </h3>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label
-                              htmlFor="accountName"
-                              className="text-sm font-medium"
-                            >
-                              Account Name *
-                            </Label>
-                            <Input
-                              id="accountName"
-                              value={accountForm.name}
-                              onChange={(e) =>
-                                setAccountForm({
-                                  ...accountForm,
-                                  name: e.target.value,
-                                })
-                              }
-                              placeholder="e.g., HDFC Savings Account"
-                              className="h-10"
-                              required
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label
-                              htmlFor="accountCode"
-                              className="text-sm font-medium"
-                            >
-                              Account Code
-                            </Label>
-                            <Input
-                              id="accountCode"
-                              value={accountForm.code}
-                              onChange={(e) =>
-                                setAccountForm({
-                                  ...accountForm,
-                                  code: e.target.value,
-                                })
-                              }
-                              placeholder="e.g., HDFC-SAV-001"
-                              className="h-10"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Account Classification Section */}
-                      <div className="space-y-4">
-                        <h3 className="text-sm font-medium text-gray-900 border-b pb-2">
-                          Account Classification
-                        </h3>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label
-                              htmlFor="accountType"
-                              className="text-sm font-medium"
-                            >
-                              Account Type *
-                            </Label>
-                            <Select
-                              value={accountForm.account_type_id}
-                              onValueChange={(value) =>
-                                setAccountForm({
-                                  ...accountForm,
-                                  account_type_id: value,
-                                })
-                              }
-                            >
-                              <SelectTrigger className="h-10">
-                                <SelectValue placeholder="Select account type" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {accountTypes.map((type) => (
-                                  <SelectItem key={type.id} value={type.id}>
-                                    <div className="flex items-center gap-3 py-1">
-                                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded font-medium">
-                                        {type.category}
-                                      </span>
-                                      <span className="font-medium">
-                                        {type.name}
-                                      </span>
-                                    </div>
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label
-                              htmlFor="initialBalance"
-                              className="text-sm font-medium"
-                            >
-                              Initial Balance (₹)
-                            </Label>
-                            <Input
-                              id="initialBalance"
-                              type="number"
-                              step="0.01"
-                              value={
-                                accountForm.is_placeholder
-                                  ? "0"
-                                  : accountForm.initial_balance
-                              }
-                              onChange={(e) =>
-                                setAccountForm({
-                                  ...accountForm,
-                                  initial_balance: e.target.value,
-                                })
-                              }
-                              placeholder="0.00"
-                              className={`h-10 ${
-                                accountForm.is_placeholder
-                                  ? "bg-gray-50 cursor-not-allowed"
-                                  : ""
-                              }`}
-                              disabled={accountForm.is_placeholder}
-                            />
-                            {accountForm.is_placeholder && (
-                              <div className="flex items-center gap-2 p-2 bg-gray-50 border border-gray-200 rounded-md">
-                                <div className="w-2 h-2 bg-gray-400 rounded-full flex-shrink-0"></div>
-                                <p className="text-xs text-gray-600">
-                                  Placeholder accounts cannot have balances
-                                </p>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Account Hierarchy Section */}
-                      <div className="space-y-4">
-                        <h3 className="text-sm font-medium text-gray-900 border-b pb-2">
-                          Account Hierarchy
-                        </h3>
-
-                        <div className="space-y-3">
-                          <Label className="text-sm font-medium">
-                            Parent Account
+                    <form onSubmit={handleAccountSubmit} className="space-y-4">
+                      {/* Basic Information */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label htmlFor="accountName" className="text-sm">
+                            Account Name *
                           </Label>
-                          <div className="border rounded-lg p-2 bg-gray-50 max-h-64 overflow-y-auto">
-                            <div className="space-y-0.5">
-                              {/* No Parent Option */}
-                              <div
-                                className={`flex items-center py-1 px-1 rounded text-sm transition-colors cursor-pointer ${
+                          <Input
+                            id="accountName"
+                            value={accountForm.name}
+                            onChange={(e) =>
+                              setAccountForm({
+                                ...accountForm,
+                                name: e.target.value,
+                              })
+                            }
+                            placeholder="Account name"
+                            className="h-9"
+                            required
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label htmlFor="accountCode" className="text-sm">
+                            Account Code
+                          </Label>
+                          <Input
+                            id="accountCode"
+                            value={accountForm.code}
+                            onChange={(e) =>
+                              setAccountForm({
+                                ...accountForm,
+                                code: e.target.value,
+                              })
+                            }
+                            placeholder="Optional code"
+                            className="h-9"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Account Classification */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label htmlFor="accountType" className="text-sm">
+                            Account Type *
+                          </Label>
+                          <Select
+                            value={accountForm.account_type_id}
+                            onValueChange={(value) =>
+                              setAccountForm({
+                                ...accountForm,
+                                account_type_id: value,
+                              })
+                            }
+                          >
+                            <SelectTrigger className="h-9">
+                              <SelectValue placeholder="Select type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {accountTypes.map((type) => (
+                                <SelectItem key={type.id} value={type.id}>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
+                                      {type.category}
+                                    </span>
+                                    <span className="text-sm">{type.name}</span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label htmlFor="initialBalance" className="text-sm">
+                            Initial Balance (₹)
+                          </Label>
+                          <Input
+                            id="initialBalance"
+                            type="number"
+                            step="0.01"
+                            value={
+                              accountForm.is_placeholder
+                                ? "0"
+                                : accountForm.initial_balance
+                            }
+                            onChange={(e) =>
+                              setAccountForm({
+                                ...accountForm,
+                                initial_balance: e.target.value,
+                              })
+                            }
+                            placeholder="0.00"
+                            className={`h-9 ${
+                              accountForm.is_placeholder
+                                ? "bg-gray-50 cursor-not-allowed"
+                                : ""
+                            }`}
+                            disabled={accountForm.is_placeholder}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Parent Account Hierarchy */}
+                      <div className="space-y-1">
+                        <Label className="text-sm">Parent Account</Label>
+                        <div className="border rounded-lg p-2 bg-gray-50 max-h-48 overflow-y-auto">
+                          <div className="space-y-0.5">
+                            {/* No Parent Option */}
+                            <div
+                              className={`flex items-center py-1 px-1 rounded text-sm transition-colors cursor-pointer ${
+                                !accountForm.parent_id ||
+                                accountForm.parent_id === "none"
+                                  ? "bg-blue-100 border border-blue-300"
+                                  : "hover:bg-gray-100"
+                              }`}
+                              onClick={() =>
+                                setAccountForm({
+                                  ...accountForm,
+                                  parent_id: "",
+                                })
+                              }
+                            >
+                              <span className="w-4 mr-1"></span>
+                              <span
+                                className={`flex-1 ${
                                   !accountForm.parent_id ||
                                   accountForm.parent_id === "none"
-                                    ? "bg-blue-100 border border-blue-300"
-                                    : "hover:bg-gray-100"
+                                    ? "text-blue-700 font-medium"
+                                    : "text-gray-900"
                                 }`}
-                                onClick={() =>
-                                  setAccountForm({
-                                    ...accountForm,
-                                    parent_id: "",
-                                  })
-                                }
                               >
-                                <span className="w-4 mr-1"></span>
-                                <span
-                                  className={`flex-1 ${
-                                    !accountForm.parent_id ||
-                                    accountForm.parent_id === "none"
-                                      ? "text-blue-700 font-medium"
-                                      : "text-gray-900"
-                                  }`}
-                                >
-                                  No Parent (Top Level)
-                                </span>
-                                {(!accountForm.parent_id ||
-                                  accountForm.parent_id === "none") && (
-                                  <span className="text-blue-600 text-xs">
-                                    ✓
-                                  </span>
-                                )}
-                              </div>
+                                No Parent (Top Level)
+                              </span>
+                              {(!accountForm.parent_id ||
+                                accountForm.parent_id === "none") && (
+                                <span className="text-blue-600 text-xs">✓</span>
+                              )}
+                            </div>
 
-                              {(() => {
-                                const hierarchicalAccounts =
-                                  buildAccountHierarchy(accounts);
+                            {(() => {
+                              const hierarchicalAccounts =
+                                buildAccountHierarchy(accounts);
 
-                                const renderAccountTree = (
-                                  account: HierarchicalAccount,
-                                  level: number = 0
-                                ): React.ReactElement => {
-                                  const isSelected =
-                                    accountForm.parent_id === account.id;
-                                  const canSelect = true; // All accounts can be parents when creating
-                                  const isExpanded = expandedParentAccounts.has(
-                                    account.id
-                                  );
-                                  const hasChildren =
-                                    account.children.length > 0;
+                              const renderAccountTree = (
+                                account: HierarchicalAccount,
+                                level: number = 0
+                              ): React.ReactElement => {
+                                const isSelected =
+                                  accountForm.parent_id === account.id;
+                                const canSelect = true; // All accounts can be parents when creating
+                                const isExpanded = expandedParentAccounts.has(
+                                  account.id
+                                );
+                                const hasChildren = account.children.length > 0;
 
-                                  return (
-                                    <div key={account.id}>
-                                      <div
-                                        className={`flex items-center py-1 px-1 rounded text-sm transition-colors ${
-                                          isSelected
-                                            ? "bg-blue-100 border border-blue-300"
-                                            : canSelect
-                                            ? "hover:bg-gray-100 cursor-pointer"
-                                            : "cursor-default"
+                                return (
+                                  <div key={account.id}>
+                                    <div
+                                      className={`flex items-center py-1 px-1 rounded text-sm transition-colors ${
+                                        isSelected
+                                          ? "bg-blue-100 border border-blue-300"
+                                          : canSelect
+                                          ? "hover:bg-gray-100 cursor-pointer"
+                                          : "cursor-default"
+                                      }`}
+                                      style={{
+                                        paddingLeft: `${4 + level * 16}px`,
+                                      }}
+                                    >
+                                      {hasChildren && (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            toggleParentAccountExpand(
+                                              account.id
+                                            );
+                                          }}
+                                          className="mr-1 p-0.5 hover:bg-gray-200 rounded"
+                                        >
+                                          {isExpanded ? (
+                                            <ChevronDown className="h-3 w-3" />
+                                          ) : (
+                                            <ChevronRight className="h-3 w-3" />
+                                          )}
+                                        </button>
+                                      )}
+                                      {!hasChildren && (
+                                        <span className="w-4 mr-1"></span>
+                                      )}
+                                      <span
+                                        className={`flex-1 ${
+                                          account.is_placeholder
+                                            ? "text-gray-600 font-medium"
+                                            : isSelected
+                                            ? "text-blue-700 font-medium"
+                                            : "text-gray-900"
                                         }`}
-                                        style={{
-                                          paddingLeft: `${4 + level * 16}px`,
+                                        onClick={() => {
+                                          if (canSelect) {
+                                            setAccountForm({
+                                              ...accountForm,
+                                              parent_id: account.id,
+                                            });
+                                          }
                                         }}
                                       >
-                                        {hasChildren && (
-                                          <button
-                                            type="button"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              toggleParentAccountExpand(
-                                                account.id
-                                              );
-                                            }}
-                                            className="mr-1 p-0.5 hover:bg-gray-200 rounded"
-                                          >
-                                            {isExpanded ? (
-                                              <ChevronDown className="h-3 w-3" />
-                                            ) : (
-                                              <ChevronRight className="h-3 w-3" />
-                                            )}
-                                          </button>
-                                        )}
-                                        {!hasChildren && (
-                                          <span className="w-4 mr-1"></span>
-                                        )}
-                                        <span
-                                          className={`flex-1 ${
-                                            account.is_placeholder
-                                              ? "text-gray-600 font-medium"
-                                              : isSelected
-                                              ? "text-blue-700 font-medium"
-                                              : "text-gray-900"
-                                          }`}
-                                          onClick={() => {
-                                            if (canSelect) {
-                                              setAccountForm({
-                                                ...accountForm,
-                                                parent_id: account.id,
-                                              });
-                                            }
-                                          }}
-                                        >
-                                          {account.name}
+                                        {account.name}
+                                      </span>
+                                      {isSelected && (
+                                        <span className="text-blue-600 text-xs">
+                                          ✓
                                         </span>
-                                        {isSelected && (
-                                          <span className="text-blue-600 text-xs">
-                                            ✓
-                                          </span>
-                                        )}
-                                      </div>
-                                      {hasChildren && isExpanded && (
-                                        <div>
-                                          {account.children.map((child) =>
-                                            renderAccountTree(child, level + 1)
-                                          )}
-                                        </div>
                                       )}
                                     </div>
-                                  );
-                                };
-
-                                return hierarchicalAccounts.map((account) =>
-                                  renderAccountTree(account, 0)
+                                    {hasChildren && isExpanded && (
+                                      <div>
+                                        {account.children.map((child) =>
+                                          renderAccountTree(child, level + 1)
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
                                 );
-                              })()}
-                            </div>
+                              };
+
+                              return hierarchicalAccounts.map((account) =>
+                                renderAccountTree(account, 0)
+                              );
+                            })()}
                           </div>
                         </div>
                       </div>
 
-                      {/* Additional Details Section */}
-                      <div className="space-y-4">
-                        <h3 className="text-sm font-medium text-gray-900 border-b pb-2">
-                          Additional Details
-                        </h3>
-
-                        <div className="space-y-2">
-                          <Label
-                            htmlFor="description"
-                            className="text-sm font-medium"
-                          >
+                      {/* Optional Fields */}
+                      <div className="space-y-2">
+                        <div className="space-y-1">
+                          <Label htmlFor="description" className="text-sm">
                             Description
                           </Label>
                           <Textarea
@@ -1091,13 +1035,13 @@ export default function Settings() {
                                 description: e.target.value,
                               })
                             }
-                            placeholder="Optional description for this account"
-                            rows={3}
+                            placeholder="Optional description"
+                            rows={2}
                             className="resize-none"
                           />
                         </div>
 
-                        <div className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center space-x-2">
                           <input
                             type="checkbox"
                             id="isPlaceholder"
@@ -1108,46 +1052,40 @@ export default function Settings() {
                                 is_placeholder: e.target.checked,
                               })
                             }
-                            className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                           />
-                          <div className="space-y-1">
-                            <Label
-                              htmlFor="isPlaceholder"
-                              className="text-sm font-medium cursor-pointer"
-                            >
-                              Placeholder Account
-                            </Label>
-                            <p className="text-xs text-gray-600">
-                              This account is used for organization only and
-                              cannot hold transactions
-                            </p>
-                          </div>
+                          <Label
+                            htmlFor="isPlaceholder"
+                            className="text-sm cursor-pointer"
+                          >
+                            Placeholder Account (organization only)
+                          </Label>
                         </div>
                       </div>
 
                       {/* Action Buttons */}
-                      <div className="flex justify-end space-x-3 pt-6 border-t">
+                      <div className="flex justify-end space-x-2 pt-3">
                         <Button
                           type="button"
                           variant="outline"
                           onClick={() => setIsAccountModalOpen(false)}
                           disabled={isSubmitting}
-                          className="px-6"
+                          className="px-4 h-9"
                         >
                           Cancel
                         </Button>
                         <Button
                           type="submit"
                           disabled={isSubmitting}
-                          className="px-6 bg-green-600 hover:bg-green-700"
+                          className="px-4 h-9 bg-green-600 hover:bg-green-700"
                         >
                           {isSubmitting ? (
                             <div className="flex items-center gap-2">
-                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                              <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                               Creating...
                             </div>
                           ) : (
-                            "Create Account"
+                            "Create"
                           )}
                         </Button>
                       </div>
@@ -1436,6 +1374,7 @@ export default function Settings() {
                   maxHeight="h-[calc(100vh-300px)] sm:h-[calc(100vh-400px)]"
                   refreshTrigger={refreshTrigger}
                   onEditAccount={handleEditAccount}
+                  onPriceUpdated={() => setRefreshTrigger((prev) => prev + 1)}
                 />
               </CardContent>
             </Card>

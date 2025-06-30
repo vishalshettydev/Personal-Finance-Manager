@@ -6,7 +6,6 @@ import { useAuthStore } from "@/stores/auth";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -14,10 +13,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { TrendingUp, Calendar, Plus } from "lucide-react";
+import { TrendingUp, Calendar } from "lucide-react";
 import { toast } from "sonner";
 
 interface Account {
@@ -264,153 +261,134 @@ export function AccountPriceModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader className="pb-4">
-          <DialogTitle className="text-xl font-semibold flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-green-600" />
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+        <DialogHeader className="pb-2">
+          <DialogTitle className="text-lg font-semibold flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-green-600" />
             Manage Prices - {account.name}
           </DialogTitle>
-          <DialogDescription className="text-sm text-gray-600">
-            Add new prices or view price history for this account. If a
-            transaction exists for the same date, it will be updated.
-          </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <div className="space-y-4">
           {/* Add New Price Form */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Plus className="h-4 w-4" />
-                Add New Price
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="price" className="text-sm font-medium">
-                      Price (₹) *
-                    </Label>
-                    <Input
-                      id="price"
-                      type="number"
-                      step="0.01"
-                      min="0.01"
-                      value={priceForm.price}
-                      onChange={(e) =>
-                        setPriceForm({ ...priceForm, price: e.target.value })
-                      }
-                      placeholder="0.00"
-                      className="h-10"
-                      required
-                    />
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="price" className="text-sm">
+                  Price (₹) *
+                </Label>
+                <Input
+                  id="price"
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  value={priceForm.price}
+                  onChange={(e) =>
+                    setPriceForm({ ...priceForm, price: e.target.value })
+                  }
+                  placeholder="0.00"
+                  className="h-9"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="date" className="text-sm">
+                  Date *
+                </Label>
+                <Input
+                  id="date"
+                  type="date"
+                  value={priceForm.date}
+                  onChange={(e) =>
+                    setPriceForm({ ...priceForm, date: e.target.value })
+                  }
+                  className="h-9"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="notes" className="text-sm">
+                Notes (Optional)
+              </Label>
+              <Textarea
+                id="notes"
+                value={priceForm.notes}
+                onChange={(e) =>
+                  setPriceForm({ ...priceForm, notes: e.target.value })
+                }
+                placeholder="Add notes..."
+                className="min-h-[60px] resize-none"
+              />
+            </div>
+
+            <div className="flex justify-end pt-1">
+              <Button
+                type="submit"
+                disabled={isSubmitting}
+                size="sm"
+                className="bg-green-600 hover:bg-green-700"
+              >
+                {isSubmitting ? (
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Adding...
                   </div>
+                ) : (
+                  "Add Price"
+                )}
+              </Button>
+            </div>
+          </form>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="date" className="text-sm font-medium">
-                      Date *
-                    </Label>
-                    <Input
-                      id="date"
-                      type="date"
-                      value={priceForm.date}
-                      onChange={(e) =>
-                        setPriceForm({ ...priceForm, date: e.target.value })
-                      }
-                      className="h-10"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="notes" className="text-sm font-medium">
-                    Notes (Optional)
-                  </Label>
-                  <Textarea
-                    id="notes"
-                    value={priceForm.notes}
-                    onChange={(e) =>
-                      setPriceForm({ ...priceForm, notes: e.target.value })
-                    }
-                    placeholder="Add any notes about this price update..."
-                    className="min-h-[80px]"
-                  />
-                </div>
-
-                <div className="flex justify-end">
-                  <Button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    {isSubmitting ? (
-                      <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        Adding...
-                      </div>
-                    ) : (
-                      "Add Price"
-                    )}
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-
-          <Separator />
+          <Separator className="my-3" />
 
           {/* Price History */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                Price History
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="w-6 h-6 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin"></div>
-                  <span className="ml-2 text-gray-600">Loading prices...</span>
-                </div>
-              ) : prices.length === 0 ? (
-                <div className="text-center py-8">
-                  <TrendingUp className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-500 mb-2">No price history found</p>
-                  <p className="text-sm text-gray-400">
-                    Add a price above to start tracking
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3 max-h-[300px] overflow-y-auto">
-                  {prices.map((price) => (
-                    <div
-                      key={price.id}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border"
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-semibold text-green-600">
-                            {formatINR(price.price)}
-                          </span>
-                          <Badge variant="outline" className="text-xs">
-                            {new Date(price.date).toLocaleDateString("en-IN")}
-                          </Badge>
-                        </div>
-                        {price.notes && (
-                          <p className="text-xs text-gray-600 mt-1">
-                            {price.notes}
-                          </p>
-                        )}
-                      </div>
+          <div>
+            <h3 className="text-sm font-medium mb-2 flex items-center gap-1">
+              <Calendar className="h-3 w-3" />
+              Price History
+            </h3>
+
+            {isLoading ? (
+              <div className="flex items-center justify-center py-4">
+                <div className="w-4 h-4 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin"></div>
+                <span className="ml-2 text-sm text-gray-600">Loading...</span>
+              </div>
+            ) : prices.length === 0 ? (
+              <div className="text-center py-4">
+                <p className="text-sm text-gray-500">No price history</p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                {prices.map((price) => (
+                  <div
+                    key={price.id}
+                    className="flex items-center justify-between p-2 bg-gray-50 rounded border"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-green-600 text-sm">
+                        {formatINR(price.price)}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {new Date(price.date).toLocaleDateString("en-IN")}
+                      </span>
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                    {price.notes && (
+                      <p
+                        className="text-xs text-gray-600 truncate max-w-[120px]"
+                        title={price.notes}
+                      >
+                        {price.notes}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>

@@ -180,7 +180,7 @@ export function AddTransactionModal({
             .includes(searchTerm.toLowerCase()))
     );
 
-    // Apply investment-specific filtering
+    // Apply transaction type filtering
     if (transactionForm.transaction_type === "investment") {
       if (isFromAccount) {
         if (transactionForm.investment_type === "buy") {
@@ -208,6 +208,11 @@ export function AddTransactionModal({
           );
         }
       }
+    } else if (transactionForm.transaction_type === "regular") {
+      // For regular transactions: exclude investment accounts from both from and to accounts
+      filteredAccounts = filteredAccounts.filter(
+        (acc) => !isInvestmentAccount(acc)
+      );
     }
 
     return filteredAccounts.slice(0, 10); // Limit to 10 results

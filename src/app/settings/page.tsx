@@ -1436,6 +1436,7 @@ export default function Settings() {
                   maxHeight="h-[calc(100vh-300px)] sm:h-[calc(100vh-400px)]"
                   refreshTrigger={refreshTrigger}
                   onEditAccount={handleEditAccount}
+                  onPriceUpdated={() => setRefreshTrigger((prev) => prev + 1)}
                 />
               </CardContent>
             </Card>

@@ -45,6 +45,7 @@ interface TransactionFormData {
   reference_number: string;
   transaction_date: string;
   transaction_type: "investment" | "regular";
+  investment_type: "buy" | "sell";
   quantity: string;
   price: string;
   amount: string;
@@ -80,6 +81,7 @@ export function AddTransactionModal({
     reference_number: "",
     transaction_date: new Date().toISOString().split("T")[0],
     transaction_type: "regular",
+    investment_type: "buy",
     quantity: "1",
     price: "",
     amount: "",
@@ -152,24 +154,106 @@ export function AddTransactionModal({
     return buildPath(account);
   };
 
-  // Search accounts by name and path
+  // Check if account is investment type (mutual fund or stock)
+  const isInvestmentAccount = (account: Account): boolean => {
+    return (
+      account.account_types.name.toLowerCase() === "mutual fund" ||
+      account.account_types.name.toLowerCase() === "stock"
+    );
+  };
+
+  // Search accounts by name and path with investment filtering
   const searchAccounts = (
     searchTerm: string,
-    excludeId?: string
+    excludeId?: string,
+    isFromAccount: boolean = false
   ): Account[] => {
     if (!searchTerm) return [];
 
-    return accounts
-      .filter(
-        (acc) =>
-          !acc.is_placeholder &&
-          acc.id !== excludeId &&
-          (acc.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            getAccountPath(acc.id)
-              .toLowerCase()
-              .includes(searchTerm.toLowerCase()))
-      )
-      .slice(0, 10); // Limit to 10 results
+    let filteredAccounts = accounts.filter(
+      (acc) =>
+        !acc.is_placeholder &&
+        acc.id !== excludeId &&
+        (acc.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          getAccountPath(acc.id)
+            .toLowerCase()
+            .includes(searchTerm.toLowerCase()))
+    );
+
+    // Apply investment-specific filtering
+    if (transactionForm.transaction_type === "investment") {
+      if (isFromAccount) {
+        if (transactionForm.investment_type === "buy") {
+          // For buy: exclude investment accounts from "from" account
+          filteredAccounts = filteredAccounts.filter(
+            (acc) => !isInvestmentAccount(acc)
+          );
+        } else {
+          // For sell: only show investment accounts in "from" account
+          filteredAccounts = filteredAccounts.filter((acc) =>
+            isInvestmentAccount(acc)
+          );
+        }
+      } else {
+        // To account
+        if (transactionForm.investment_type === "buy") {
+          // For buy: only show investment accounts in "to" account
+          filteredAccounts = filteredAccounts.filter((acc) =>
+            isInvestmentAccount(acc)
+          );
+        } else {
+          // For sell: exclude investment accounts from "to" account
+          filteredAccounts = filteredAccounts.filter(
+            (acc) => !isInvestmentAccount(acc)
+          );
+        }
+      }
+    }
+
+    return filteredAccounts.slice(0, 10); // Limit to 10 results
+  };
+
+  // Update account price in account_prices table
+  const updateAccountPrice = async (accountId: string, price: number) => {
+    try {
+      const { data: existingPrice, error: fetchError } = await supabase
+        .from("account_prices")
+        .select("*")
+        .eq("account_id", accountId)
+        .eq("date", transactionForm.transaction_date)
+        .single();
+
+      if (fetchError && fetchError.code !== "PGRST116") {
+        // PGRST116 is "no rows returned" which is expected when no price exists
+        throw fetchError;
+      }
+
+      if (existingPrice) {
+        // Update existing price
+        const { error: updateError } = await supabase
+          .from("account_prices")
+          .update({ price })
+          .eq("account_id", accountId)
+          .eq("date", transactionForm.transaction_date);
+
+        if (updateError) throw updateError;
+      } else {
+        // Insert new price
+        const { error: insertError } = await supabase
+          .from("account_prices")
+          .insert({
+            account_id: accountId,
+            price,
+            date: transactionForm.transaction_date,
+          });
+
+        if (insertError) throw insertError;
+      }
+    } catch (error) {
+      console.error("Error updating account price:", error);
+      // Don't throw here to avoid blocking the main transaction
+      toast.error("Warning: Could not update account price");
+    }
   };
 
   // Calculate amount for investment transactions
@@ -229,6 +313,7 @@ export function AddTransactionModal({
       reference_number: "",
       transaction_date: new Date().toISOString().split("T")[0],
       transaction_type: "regular",
+      investment_type: "buy",
       quantity: "1",
       price: "",
       amount: "",
@@ -351,6 +436,24 @@ export function AddTransactionModal({
       // Update account balances
       await AccountingEngine.updateAccountBalances(entriesWithTransactionId);
 
+      // Update account price for investment transactions
+      if (transactionForm.transaction_type === "investment") {
+        const priceValue = parseFloat(transactionForm.price);
+        if (transactionForm.investment_type === "buy") {
+          // For buy transactions, update price for the "to" account (investment account)
+          await updateAccountPrice(
+            transactionForm.credit_account_id,
+            priceValue
+          );
+        } else {
+          // For sell transactions, update price for the "from" account (investment account)
+          await updateAccountPrice(
+            transactionForm.debit_account_id,
+            priceValue
+          );
+        }
+      }
+
       // Reset form and refresh data
       resetForm();
       onTransactionAdded();
@@ -393,12 +496,18 @@ export function AddTransactionModal({
                   : "outline"
               }
               size="sm"
-              onClick={() =>
+              onClick={() => {
                 setTransactionForm({
                   ...transactionForm,
                   transaction_type: "regular",
-                })
-              }
+                  debit_account_id: "",
+                  credit_account_id: "",
+                });
+                setFromAccountSearch("");
+                setToAccountSearch("");
+                setShowFromDropdown(false);
+                setShowToDropdown(false);
+              }}
               className="flex-1 h-8"
             >
               <ArrowRightLeft className="w-3 h-3 mr-1" />
@@ -412,18 +521,78 @@ export function AddTransactionModal({
                   : "outline"
               }
               size="sm"
-              onClick={() =>
+              onClick={() => {
                 setTransactionForm({
                   ...transactionForm,
                   transaction_type: "investment",
-                })
-              }
+                  debit_account_id: "",
+                  credit_account_id: "",
+                });
+                setFromAccountSearch("");
+                setToAccountSearch("");
+                setShowFromDropdown(false);
+                setShowToDropdown(false);
+              }}
               className="flex-1 h-8"
             >
               <TrendingUp className="w-3 h-3 mr-1" />
               Investment
             </Button>
           </div>
+
+          {/* Investment Type (Buy/Sell) - Only show when Investment is selected */}
+          {transactionForm.transaction_type === "investment" && (
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant={
+                  transactionForm.investment_type === "buy"
+                    ? "default"
+                    : "outline"
+                }
+                size="sm"
+                onClick={() => {
+                  setTransactionForm({
+                    ...transactionForm,
+                    investment_type: "buy",
+                    debit_account_id: "",
+                    credit_account_id: "",
+                  });
+                  setFromAccountSearch("");
+                  setToAccountSearch("");
+                  setShowFromDropdown(false);
+                  setShowToDropdown(false);
+                }}
+                className="flex-1 h-8"
+              >
+                Buy
+              </Button>
+              <Button
+                type="button"
+                variant={
+                  transactionForm.investment_type === "sell"
+                    ? "default"
+                    : "outline"
+                }
+                size="sm"
+                onClick={() => {
+                  setTransactionForm({
+                    ...transactionForm,
+                    investment_type: "sell",
+                    debit_account_id: "",
+                    credit_account_id: "",
+                  });
+                  setFromAccountSearch("");
+                  setToAccountSearch("");
+                  setShowFromDropdown(false);
+                  setShowToDropdown(false);
+                }}
+                className="flex-1 h-8"
+              >
+                Sell
+              </Button>
+            </div>
+          )}
 
           {/* Basic Fields */}
           <div className="grid grid-cols-2 gap-3">
@@ -586,29 +755,34 @@ export function AddTransactionModal({
               )}
               {showFromDropdown && (
                 <div className="absolute top-full left-0 right-0 z-10 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
-                  {searchAccounts(fromAccountSearch).map((account) => (
-                    <button
-                      key={account.id}
-                      type="button"
-                      onClick={() => {
-                        setTransactionForm({
-                          ...transactionForm,
-                          debit_account_id: account.id,
-                          credit_account_id: "",
-                        });
-                        setFromAccountSearch(account.name);
-                        setShowFromDropdown(false);
-                        setToAccountSearch("");
-                      }}
-                      className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b last:border-b-0"
-                    >
-                      <div className="font-medium text-sm">{account.name}</div>
-                      <div className="text-xs text-gray-500">
-                        {getAccountPath(account.id)}
-                      </div>
-                    </button>
-                  ))}
-                  {searchAccounts(fromAccountSearch).length === 0 && (
+                  {searchAccounts(fromAccountSearch, undefined, true).map(
+                    (account) => (
+                      <button
+                        key={account.id}
+                        type="button"
+                        onClick={() => {
+                          setTransactionForm({
+                            ...transactionForm,
+                            debit_account_id: account.id,
+                            credit_account_id: "",
+                          });
+                          setFromAccountSearch(account.name);
+                          setShowFromDropdown(false);
+                          setToAccountSearch("");
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b last:border-b-0"
+                      >
+                        <div className="font-medium text-sm">
+                          {account.name}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {getAccountPath(account.id)}
+                        </div>
+                      </button>
+                    )
+                  )}
+                  {searchAccounts(fromAccountSearch, undefined, true).length ===
+                    0 && (
                     <div className="text-center text-gray-500 py-3 text-sm">
                       No accounts found
                     </div>
@@ -643,7 +817,8 @@ export function AddTransactionModal({
                 <div className="absolute top-full left-0 right-0 z-10 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
                   {searchAccounts(
                     toAccountSearch,
-                    transactionForm.debit_account_id
+                    transactionForm.debit_account_id,
+                    false
                   ).map((account) => (
                     <button
                       key={account.id}
@@ -666,7 +841,8 @@ export function AddTransactionModal({
                   ))}
                   {searchAccounts(
                     toAccountSearch,
-                    transactionForm.debit_account_id
+                    transactionForm.debit_account_id,
+                    false
                   ).length === 0 && (
                     <div className="text-center text-gray-500 py-3 text-sm">
                       No accounts found

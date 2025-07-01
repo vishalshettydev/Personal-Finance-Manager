@@ -47,7 +47,7 @@ CREATE TABLE public.accounts (
   description TEXT,
   is_placeholder BOOLEAN DEFAULT false,
   is_active BOOLEAN DEFAULT true,
-  balance NUMERIC DEFAULT 0,
+  balance NUMERIC(20,6) DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -99,7 +99,7 @@ CREATE TABLE public.transactions (
   reference_number VARCHAR,
   description TEXT NOT NULL,
   transaction_date DATE NOT NULL,
-  total_amount NUMERIC NOT NULL,
+  total_amount NUMERIC(20,6) NOT NULL,
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
@@ -109,10 +109,10 @@ CREATE TABLE public.transaction_entries (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   transaction_id UUID REFERENCES public.transactions(id),
   account_id UUID REFERENCES public.accounts(id),
-  quantity NUMERIC DEFAULT 0,
-  price NUMERIC DEFAULT 0,
+  quantity NUMERIC(20,8) DEFAULT 0,
+  price NUMERIC(20,8) DEFAULT 0,
   entry_type entry_type_enum NOT NULL,
-  amount NUMERIC DEFAULT 0,
+  amount NUMERIC(20,6) DEFAULT 0,
   description TEXT
 );
 
@@ -140,7 +140,7 @@ CREATE TABLE public.account_prices (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id),
   account_id UUID REFERENCES public.accounts(id),
-  price NUMERIC NOT NULL,
+  price NUMERIC(20,8) NOT NULL,
   date DATE NOT NULL,
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
@@ -156,7 +156,7 @@ CREATE TABLE public.budgets (
   period_type VARCHAR NOT NULL CHECK (period_type IN ('MONTHLY', 'QUARTERLY', 'YEARLY')),
   start_date DATE NOT NULL,
   end_date DATE NOT NULL,
-  total_amount NUMERIC NOT NULL,
+  total_amount NUMERIC(20,6) NOT NULL,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -164,8 +164,8 @@ CREATE TABLE public.budget_categories (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   budget_id UUID REFERENCES public.budgets(id),
   account_id UUID REFERENCES public.accounts(id),
-  allocated_amount NUMERIC NOT NULL,
-  spent_amount NUMERIC DEFAULT 0
+  allocated_amount NUMERIC(20,6) NOT NULL,
+  spent_amount NUMERIC(20,6) DEFAULT 0
 );
 
 -- ========================
@@ -174,7 +174,7 @@ CREATE TABLE public.budget_categories (
 CREATE TABLE public.account_balance_snapshots (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   account_id UUID REFERENCES public.accounts(id),
-  balance NUMERIC NOT NULL,
+  balance NUMERIC(20,6) NOT NULL,
   snapshot_date DATE NOT NULL,
   created_at TIMESTAMPTZ DEFAULT now()
 );

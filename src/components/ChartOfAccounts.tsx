@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/auth";
 import { AccountPriceModal } from "./accounting/AccountPriceModal";
+import { useRouter } from "next/navigation";
 import {
   Building2,
   CreditCard,
@@ -25,6 +26,7 @@ interface TreeNode {
   name: string;
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   balance?: number;
+  units?: number;
   type?: string;
   account_type?: string;
   user_id?: string | null;
@@ -43,6 +45,7 @@ interface Account {
   is_placeholder?: boolean | null;
   is_active: boolean | null;
   balance: number | null;
+  units?: number;
   created_at: string | null;
   updated_at: string | null;
   account_types?: {
@@ -70,6 +73,7 @@ export default function ChartOfAccounts({
   onPriceUpdated,
 }: ChartOfAccountsProps) {
   const { user } = useAuthStore();
+  const router = useRouter();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [accountsTree, setAccountsTree] = useState<TreeNode[]>([]);
   const [expandedNodes, setExpandedNodes] = useState<string[]>([]);
@@ -99,8 +103,8 @@ export default function ChartOfAccounts({
     return new Intl.NumberFormat("en-IN", {
       style: "currency",
       currency: "INR",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(amount);
   };
 
@@ -142,6 +146,40 @@ export default function ChartOfAccounts({
     []
   );
 
+  // Calculate total units for investment accounts
+  const calculateAccountUnits = useCallback(
+    async (accountId: string): Promise<number> => {
+      try {
+        const { data: entries, error } = await supabase
+          .from("transaction_entries")
+          .select("entry_type, quantity")
+          .eq("account_id", accountId);
+
+        if (error) throw error;
+
+        let totalUnits = 0;
+
+        entries?.forEach((entry) => {
+          const quantity = entry.quantity || 0;
+          const entryType = entry.entry_type;
+
+          // For investment accounts: CREDIT = buying units (+), DEBIT = selling units (-)
+          if (entryType === "CREDIT") {
+            totalUnits += quantity; // Units bought/received
+          } else if (entryType === "DEBIT") {
+            totalUnits -= quantity; // Units sold/withdrawn
+          }
+        });
+
+        return totalUnits;
+      } catch {
+        // Silently handle errors and return 0 units
+        return 0;
+      }
+    },
+    []
+  );
+
   // Fetch accounts from database
   const fetchAccounts = useCallback(async () => {
     if (!user) return;
@@ -164,13 +202,26 @@ export default function ChartOfAccounts({
 
       if (error) throw error;
 
-      // Calculate real balances for each account
+      // Calculate real balances and units for each account
       const accountsWithBalances = await Promise.all(
         (data || []).map(async (account) => {
           const calculatedBalance = await calculateAccountBalance(account.id);
+
+          // Calculate units for investment accounts (mutual funds and stocks)
+          const isInvestmentAccount =
+            account.account_types?.name
+              ?.toLowerCase()
+              .includes("mutual fund") ||
+            account.account_types?.name?.toLowerCase().includes("stock");
+
+          const calculatedUnits = isInvestmentAccount
+            ? await calculateAccountUnits(account.id)
+            : 0;
+
           return {
             ...account,
             balance: calculatedBalance,
+            units: calculatedUnits,
           };
         })
       );
@@ -179,7 +230,7 @@ export default function ChartOfAccounts({
     } catch (error) {
       console.error("Error fetching accounts:", error);
     }
-  }, [user, calculateAccountBalance]);
+  }, [user, calculateAccountBalance, calculateAccountUnits]);
 
   // Get icon based on account type
   const getAccountIcon = (accountType: string, accountName: string) => {
@@ -217,6 +268,7 @@ export default function ChartOfAccounts({
         name: account.name,
         icon: getAccountIcon(account.account_types?.name || "", account.name),
         balance: account.balance || 0,
+        units: account.units || 0,
         type: account.account_types?.name || "Unknown",
         account_type: account.account_types?.category || "Unknown",
         user_id: account.user_id,
@@ -351,7 +403,14 @@ export default function ChartOfAccounts({
           className={`group flex items-center w-full py-1 px-2 text-left hover:bg-gray-50 transition-colors cursor-pointer ${
             level > 0 ? "border-l border-gray-200 ml-1" : ""
           } min-w-0`}
-          onClick={() => hasChildren && toggleNode(node.id)}
+          onClick={() => {
+            if (hasChildren) {
+              toggleNode(node.id);
+            } else if (!node.is_placeholder) {
+              // Navigate to account detail page for leaf nodes (actual accounts)
+              router.push(`/account/${node.id}`);
+            }
+          }}
         >
           {hasChildren ? (
             isExpanded ? (
@@ -382,13 +441,24 @@ export default function ChartOfAccounts({
           {node.balance !== undefined &&
             !hasChildren &&
             !node.is_placeholder && (
-              <span
-                className={`font-semibold flex-shrink-0 ml-2 text-right text-xs ${
-                  node.balance >= 0 ? "text-green-600" : "text-red-600"
-                } min-w-0 truncate max-w-[100px]`}
-              >
-                {formatINR(Math.abs(node.balance))}
-              </span>
+              <div className="flex flex-col items-end ml-2 text-right">
+                <span
+                  className={`font-semibold flex-shrink-0 text-xs ${
+                    node.balance >= 0 ? "text-green-600" : "text-red-600"
+                  } min-w-0 truncate max-w-[100px]`}
+                >
+                  {formatINR(Math.abs(node.balance))}
+                </span>
+                {/* Show units for investment accounts */}
+                {(node.type?.toLowerCase().includes("mutual fund") ||
+                  node.type?.toLowerCase().includes("stock")) &&
+                  node.units !== undefined &&
+                  node.units > 0 && (
+                    <span className="text-xs text-gray-500 min-w-0 truncate max-w-[100px]">
+                      ({node.units.toFixed(3)})
+                    </span>
+                  )}
+              </div>
             )}
 
           {hasChildren && (

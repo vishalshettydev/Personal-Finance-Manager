@@ -68,7 +68,7 @@ export function AccountPriceModal({
       style: "currency",
       currency: "INR",
       minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
+      maximumFractionDigits: 8,
     }).format(amount);
   };
 
@@ -94,38 +94,6 @@ export function AccountPriceModal({
     }
   };
 
-  // Check if transaction exists for the same date
-  const checkExistingTransaction = async (date: string) => {
-    if (!account || !user) return null;
-
-    try {
-      const { data, error } = await supabase
-        .from("transactions")
-        .select(
-          `
-          id,
-          transaction_entries!inner (
-            id,
-            account_id,
-            price,
-            entry_type
-          )
-        `
-        )
-        .eq("user_id", user.id)
-        .eq("transaction_date", date)
-        .eq("transaction_entries.account_id", account.id)
-        .eq("transaction_entries.entry_type", "BUY")
-        .single();
-
-      if (error && error.code !== "PGRST116") throw error;
-      return data;
-    } catch (error) {
-      console.error("Error checking existing transaction:", error);
-      return null;
-    }
-  };
-
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -139,87 +107,24 @@ export function AccountPriceModal({
 
     setIsSubmitting(true);
     try {
-      // Check if a transaction exists for the same date
-      const existingTransaction = await checkExistingTransaction(
-        priceForm.date
-      );
-
-      if (existingTransaction) {
-        // Update existing transaction entry
-        const { error: updateError } = await supabase
-          .from("transaction_entries")
-          .update({
-            price: price,
-            amount: price,
-            description: `Price update for ${account.name}`,
-          })
-          .eq("transaction_id", existingTransaction.id)
-          .eq("account_id", account.id);
-
-        if (updateError) throw updateError;
-
-        // Update the transaction total
-        const { error: transactionUpdateError } = await supabase
-          .from("transactions")
-          .update({
-            total_amount: price,
-            description: `Price update for ${account.name}`,
-            notes: priceForm.notes || null,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", existingTransaction.id);
-
-        if (transactionUpdateError) throw transactionUpdateError;
-
-        toast.success("Transaction updated with new price!");
-      } else {
-        // Create new transaction for price update
-        const { data: transaction, error: transactionError } = await supabase
-          .from("transactions")
-          .insert({
-            user_id: user.id,
-            reference_number: `PRICE-${account.id.substring(0, 8)}`,
-            description: `Price update for ${account.name}`,
-            transaction_date: priceForm.date,
-            total_amount: price,
-            notes: priceForm.notes || null,
-          })
-          .select()
-          .single();
-
-        if (transactionError) throw transactionError;
-
-        // Create transaction entry
-        const { error: entryError } = await supabase
-          .from("transaction_entries")
-          .insert({
-            transaction_id: transaction.id,
-            account_id: account.id,
-            quantity: 1,
-            price: price,
-            entry_type: "BUY",
-            amount: price,
-            description: `Price update for ${account.name}`,
-          });
-
-        if (entryError) throw entryError;
-        toast.success("New price transaction created!");
-      }
-
-      // Add or update account price record
+      // Check if a price already exists for this date
       const existingPrice = prices.find((p) => p.date === priceForm.date);
 
       if (existingPrice) {
+        // Update existing price record
         const { error: priceUpdateError } = await supabase
           .from("account_prices")
           .update({
             price: price,
             notes: priceForm.notes || null,
+            updated_at: new Date().toISOString(),
           })
           .eq("id", existingPrice.id);
 
         if (priceUpdateError) throw priceUpdateError;
+        toast.success("Price updated successfully!");
       } else {
+        // Insert new price record
         const { error: priceInsertError } = await supabase
           .from("account_prices")
           .insert({
@@ -231,6 +136,7 @@ export function AccountPriceModal({
           });
 
         if (priceInsertError) throw priceInsertError;
+        toast.success("Price added successfully!");
       }
 
       // Reset form and refresh data
@@ -280,13 +186,13 @@ export function AccountPriceModal({
                 <Input
                   id="price"
                   type="number"
-                  step="0.01"
-                  min="0.01"
+                  step="0.00000001"
+                  min="0.00000001"
                   value={priceForm.price}
                   onChange={(e) =>
                     setPriceForm({ ...priceForm, price: e.target.value })
                   }
-                  placeholder="0.00"
+                  placeholder="0.00000000"
                   className="h-9"
                   required
                 />

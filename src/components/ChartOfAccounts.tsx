@@ -26,6 +26,7 @@ interface TreeNode {
   name: string;
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   balance?: number;
+  marketValue?: number;
   units?: number;
   type?: string;
   account_type?: string;
@@ -45,6 +46,7 @@ interface Account {
   is_placeholder?: boolean | null;
   is_active: boolean | null;
   balance: number | null;
+  marketValue?: number;
   units?: number;
   created_at: string | null;
   updated_at: string | null;
@@ -180,6 +182,27 @@ export default function ChartOfAccounts({
     []
   );
 
+  // Get current price for investment account
+  const getCurrentPrice = useCallback(
+    async (accountId: string): Promise<number> => {
+      try {
+        const { data, error } = await supabase
+          .from("account_prices")
+          .select("price")
+          .eq("account_id", accountId)
+          .order("date", { ascending: false })
+          .limit(1)
+          .single();
+
+        if (error && error.code !== "PGRST116") throw error;
+        return data?.price || 0;
+      } catch {
+        return 0;
+      }
+    },
+    []
+  );
+
   // Fetch accounts from database
   const fetchAccounts = useCallback(async () => {
     if (!user) return;
@@ -202,7 +225,7 @@ export default function ChartOfAccounts({
 
       if (error) throw error;
 
-      // Calculate real balances and units for each account
+      // Calculate real balances, units, and market values for each account
       const accountsWithBalances = await Promise.all(
         (data || []).map(async (account) => {
           const calculatedBalance = await calculateAccountBalance(account.id);
@@ -218,9 +241,19 @@ export default function ChartOfAccounts({
             ? await calculateAccountUnits(account.id)
             : 0;
 
+          // Calculate market value for investment accounts
+          let marketValue = calculatedBalance; // Default to regular balance
+          if (isInvestmentAccount && calculatedUnits > 0) {
+            const currentPrice = await getCurrentPrice(account.id);
+            if (currentPrice > 0) {
+              marketValue = calculatedUnits * currentPrice;
+            }
+          }
+
           return {
             ...account,
             balance: calculatedBalance,
+            marketValue: marketValue,
             units: calculatedUnits,
           };
         })
@@ -230,7 +263,7 @@ export default function ChartOfAccounts({
     } catch (error) {
       console.error("Error fetching accounts:", error);
     }
-  }, [user, calculateAccountBalance, calculateAccountUnits]);
+  }, [user, calculateAccountBalance, calculateAccountUnits, getCurrentPrice]);
 
   // Get icon based on account type
   const getAccountIcon = (accountType: string, accountName: string) => {
@@ -268,6 +301,7 @@ export default function ChartOfAccounts({
         name: account.name,
         icon: getAccountIcon(account.account_types?.name || "", account.name),
         balance: account.balance || 0,
+        marketValue: account.marketValue || 0,
         units: account.units || 0,
         type: account.account_types?.name || "Unknown",
         account_type: account.account_types?.category || "Unknown",
@@ -318,7 +352,7 @@ export default function ChartOfAccounts({
       };
       loadData();
     }
-  }, [user, refreshTrigger]); // Add refreshTrigger to dependencies
+  }, [user, refreshTrigger, fetchAccounts]); // Add refreshTrigger to dependencies
 
   // Build tree when accounts change
   useEffect(() => {
@@ -368,8 +402,14 @@ export default function ChartOfAccounts({
   // Helper function to calculate total balance of child accounts
   const getTotalBalance = (node: TreeNode): number => {
     if (!node.children || node.children.length === 0) {
-      // For leaf nodes, return their balance (0 if placeholder)
-      return node.is_placeholder ? 0 : node.balance || 0;
+      // For leaf nodes, return market value for investment accounts, otherwise balance
+      if (node.is_placeholder) return 0;
+
+      const isInvestmentAccount =
+        node.type?.toLowerCase().includes("mutual fund") ||
+        node.type?.toLowerCase().includes("stock");
+
+      return isInvestmentAccount ? node.marketValue || 0 : node.balance || 0;
     }
 
     // For parent nodes, sum all child balances recursively
@@ -442,13 +482,24 @@ export default function ChartOfAccounts({
             !hasChildren &&
             !node.is_placeholder && (
               <div className="flex flex-col items-end ml-2 text-right">
-                <span
-                  className={`font-semibold flex-shrink-0 text-xs ${
-                    node.balance >= 0 ? "text-green-600" : "text-red-600"
-                  } min-w-0 truncate max-w-[100px]`}
-                >
-                  {formatINR(Math.abs(node.balance))}
-                </span>
+                {(() => {
+                  const isInvestmentAccount =
+                    node.type?.toLowerCase().includes("mutual fund") ||
+                    node.type?.toLowerCase().includes("stock");
+                  const displayValue = isInvestmentAccount
+                    ? node.marketValue || 0
+                    : node.balance || 0;
+
+                  return (
+                    <span
+                      className={`font-semibold flex-shrink-0 text-xs ${
+                        displayValue >= 0 ? "text-green-600" : "text-red-600"
+                      } min-w-0 truncate max-w-[100px]`}
+                    >
+                      {formatINR(Math.abs(displayValue))}
+                    </span>
+                  );
+                })()}
                 {/* Show units for investment accounts */}
                 {(node.type?.toLowerCase().includes("mutual fund") ||
                   node.type?.toLowerCase().includes("stock")) &&

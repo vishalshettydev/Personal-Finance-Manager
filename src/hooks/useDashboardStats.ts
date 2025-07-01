@@ -9,6 +9,9 @@ export interface DashboardStats {
   assets: number;
   liabilities: number;
   totalInvestments: number;
+  totalInvested: number;
+  unrealizedProfit: number;
+  unrealizedProfitPercentage: number;
   stocks: number;
   mutualFunds: number;
   bondsAndFDs: number;
@@ -23,6 +26,9 @@ export const useDashboardStats = (userId: string | null) => {
     assets: 0,
     liabilities: 0,
     totalInvestments: 0,
+    totalInvested: 0,
+    unrealizedProfit: 0,
+    unrealizedProfitPercentage: 0,
     stocks: 0,
     mutualFunds: 0,
     bondsAndFDs: 0,
@@ -125,45 +131,94 @@ export const useDashboardStats = (userId: string | null) => {
       let mutualFunds = 0;
       let bondsAndFDs = 0;
 
-      // Calculate real account balances from transaction entries
+      // Calculate real account balances and units from transaction entries
       const accountBalances = new Map<string, number>();
+      const accountUnits = new Map<string, number>();
 
-      // First, calculate balance for each account from transaction entries
+      // First, calculate balance and units for each account from transaction entries
       // Using simplified logic: CREDIT = money deposited (+), DEBIT = money withdrawn (-)
       transactions?.forEach((transaction) => {
         transaction.transaction_entries?.forEach((entry) => {
           const accountId = entry.account_id;
           const amount = entry.amount || 0;
+          const quantity = entry.quantity || 0;
           const entryType = entry.entry_type;
 
           if (!accountId) return;
 
           const currentBalance = accountBalances.get(accountId) || 0;
+          const currentUnits = accountUnits.get(accountId) || 0;
+
           // Simple logic: CREDIT adds to balance, DEBIT subtracts from balance
           let balanceChange = 0;
+          let unitsChange = 0;
+
           if (entryType === "CREDIT") {
             balanceChange = amount;
+            unitsChange = quantity; // Units bought
           } else if (entryType === "DEBIT") {
             balanceChange = -amount;
+            unitsChange = -quantity; // Units sold
           } else if (entryType === "BUY") {
             balanceChange = -amount; // Money going out
+            unitsChange = quantity; // Units bought
           } else if (entryType === "SELL") {
             balanceChange = amount; // Money coming in
+            unitsChange = -quantity; // Units sold
           }
 
           accountBalances.set(accountId, currentBalance + balanceChange);
+          accountUnits.set(accountId, currentUnits + unitsChange);
         });
       });
 
+      // Get current prices for investment accounts
+      const getCurrentPrice = async (accountId: string): Promise<number> => {
+        try {
+          const { data, error } = await supabase
+            .from("account_prices")
+            .select("price")
+            .eq("account_id", accountId)
+            .order("date", { ascending: false })
+            .limit(1)
+            .single();
+
+          if (error && error.code !== "PGRST116") throw error;
+          return data?.price || 0;
+        } catch {
+          return 0;
+        }
+      };
+
       // Sum balances by category for assets and liabilities
-      accounts?.forEach((account) => {
+      // Use await for async operations to get market values for investment accounts
+      for (const account of accounts || []) {
         const balance = accountBalances.get(account.id) || 0;
+        const units = accountUnits.get(account.id) || 0;
         const category = account.account_types?.category;
+        const accountType = account.account_types?.name?.toLowerCase() || "";
 
         switch (category) {
           case "ASSET":
-            // Assets: Include all asset balances (positive when you own money/things)
-            assets += balance;
+            // Check if this is an investment account
+            const isInvestmentAccount =
+              accountType.includes("mutual fund") ||
+              accountType.includes("stock");
+
+            if (isInvestmentAccount && units > 0) {
+              // For investment accounts, use market value (units × current price)
+              const currentPrice = await getCurrentPrice(account.id);
+              if (currentPrice > 0) {
+                const marketValue = units * currentPrice;
+                assets += marketValue;
+              } else {
+                // Fallback to balance if no price available
+                assets += balance;
+              }
+            } else {
+              // For regular assets, use balance
+              assets += balance;
+            }
             break;
           case "LIABILITY":
             // Liabilities: Credit balance = money you owe (positive liability)
@@ -171,7 +226,7 @@ export const useDashboardStats = (userId: string | null) => {
             liabilities += Math.abs(balance); // Ensure liabilities are always positive for net worth calc
             break;
         }
-      });
+      }
 
       // Calculate income and expenses from transactions
       // With simplified logic: track actual money flow to/from income and expense accounts
@@ -225,7 +280,49 @@ export const useDashboardStats = (userId: string | null) => {
         });
       }
 
-      // Calculate investment totals
+      // Calculate investment totals and invested amounts from our own accounts
+      let totalInvested = 0;
+
+      for (const account of accounts || []) {
+        const units = accountUnits.get(account.id) || 0;
+        const investedAmount = accountBalances.get(account.id) || 0; // This is the actual money invested
+        const accountType = account.account_types?.name?.toLowerCase() || "";
+        const category = account.account_types?.category;
+
+        if (category === "ASSET" && units > 0) {
+          const isInvestmentAccount =
+            accountType.includes("mutual fund") ||
+            accountType.includes("stock");
+
+          if (isInvestmentAccount) {
+            // Add to total invested amount (actual money put in)
+            totalInvested += Math.abs(investedAmount);
+
+            const currentPrice = await getCurrentPrice(account.id);
+            if (currentPrice > 0) {
+              const marketValue = units * currentPrice;
+              totalInvestments += marketValue;
+
+              if (accountType.includes("stock")) {
+                stocks += marketValue;
+              } else if (accountType.includes("mutual fund")) {
+                mutualFunds += marketValue;
+              }
+            } else {
+              // If no current price, use invested amount as fallback
+              totalInvestments += Math.abs(investedAmount);
+
+              if (accountType.includes("stock")) {
+                stocks += Math.abs(investedAmount);
+              } else if (accountType.includes("mutual fund")) {
+                mutualFunds += Math.abs(investedAmount);
+              }
+            }
+          }
+        }
+      }
+
+      // Also include legacy investments if they exist
       investments?.forEach((investment) => {
         const currentValue =
           (investment.quantity || 0) *
@@ -254,16 +351,23 @@ export const useDashboardStats = (userId: string | null) => {
         const accountName = account.name.toLowerCase();
 
         if (category === "ASSET") {
-          // Include bank accounts, cash, and similar liquid assets, exclude property and investments
-          if (
-            accountType.includes("bank") ||
-            accountType.includes("cash") ||
-            accountName.includes("bank") ||
-            accountName.includes("cash") ||
-            accountName.includes("checking") ||
-            accountName.includes("savings")
-          ) {
-            liquidAssets += balance; // Include negative balances too (overdrawn accounts)
+          // Exclude investment accounts from liquid assets
+          const isInvestmentAccount =
+            accountType.includes("mutual fund") ||
+            accountType.includes("stock");
+
+          if (!isInvestmentAccount) {
+            // Include bank accounts, cash, and similar liquid assets, exclude property and investments
+            if (
+              accountType.includes("bank") ||
+              accountType.includes("cash") ||
+              accountName.includes("bank") ||
+              accountName.includes("cash") ||
+              accountName.includes("checking") ||
+              accountName.includes("savings")
+            ) {
+              liquidAssets += balance; // Include negative balances too (overdrawn accounts)
+            }
           }
         }
       });
@@ -271,6 +375,11 @@ export const useDashboardStats = (userId: string | null) => {
       // Calculate derived values
       const netWorth = assets - liabilities;
       const totalBalance = liquidAssets; // Total balance refers to liquid assets
+
+      // Calculate unrealized profit and percentage
+      const unrealizedProfit = totalInvestments - totalInvested;
+      const unrealizedProfitPercentage =
+        totalInvested > 0 ? (unrealizedProfit / totalInvested) * 100 : 0;
 
       // Debug: Log comprehensive info for troubleshooting
       console.log("Dashboard Stats Debug:", {
@@ -329,6 +438,9 @@ export const useDashboardStats = (userId: string | null) => {
         assets,
         liabilities,
         totalInvestments,
+        totalInvested,
+        unrealizedProfit,
+        unrealizedProfitPercentage,
         stocks,
         mutualFunds,
         bondsAndFDs,

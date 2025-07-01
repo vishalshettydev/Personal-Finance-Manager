@@ -45,21 +45,14 @@ interface Transaction {
   transaction_date: string;
   total_amount: number;
   notes: string | null;
-  created_at: string;
+  created_at: string | null;
   transaction_entries: Array<{
     id: string;
     entry_type: string;
-    amount: number;
+    amount: number | null;
     quantity: number | null;
+    account_id: string | null;
   }>;
-}
-
-interface AccountPrice {
-  id: string;
-  account_id: string;
-  price: number;
-  date: string;
-  created_at: string;
 }
 
 export default function AccountDetailPage() {
@@ -102,8 +95,8 @@ export default function AccountDetailPage() {
     return new Intl.NumberFormat("en-IN", {
       style: "currency",
       currency: "INR",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 6,
     }).format(amount);
   };
 
@@ -221,11 +214,11 @@ export default function AccountDetailPage() {
       transaction.transaction_entries.forEach((entry) => {
         if (entry.entry_type === "CREDIT") {
           // Money invested (buying)
-          totalInvested += entry.amount;
+          totalInvested += entry.amount || 0;
           totalUnits += entry.quantity || 0;
         } else if (entry.entry_type === "DEBIT") {
           // Money withdrawn (selling)
-          totalInvested -= entry.amount;
+          totalInvested -= entry.amount || 0;
           totalUnits -= entry.quantity || 0;
         }
       });
@@ -467,7 +460,7 @@ export default function AccountDetailPage() {
                           }`}
                         >
                           {entry.entry_type === "CREDIT" ? "+" : "-"}
-                          {formatINR(Math.abs(entry.amount))}
+                          {formatINR(Math.abs(entry.amount || 0))}
                         </div>
                       </div>
                     </div>

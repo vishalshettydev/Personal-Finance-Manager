@@ -68,7 +68,7 @@ export function AccountPriceModal({
       style: "currency",
       currency: "INR",
       minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
+      maximumFractionDigits: 8,
     }).format(amount);
   };
 
@@ -186,13 +186,13 @@ export function AccountPriceModal({
                 <Input
                   id="price"
                   type="number"
-                  step="0.01"
-                  min="0.01"
+                  step="0.00000001"
+                  min="0.00000001"
                   value={priceForm.price}
                   onChange={(e) =>
                     setPriceForm({ ...priceForm, price: e.target.value })
                   }
-                  placeholder="0.00"
+                  placeholder="0.00000000"
                   className="h-9"
                   required
                 />

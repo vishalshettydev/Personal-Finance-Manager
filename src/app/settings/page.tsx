@@ -865,7 +865,7 @@ export default function Settings() {
                           <Input
                             id="initialBalance"
                             type="number"
-                            step="0.01"
+                            step="0.000001"
                             value={
                               accountForm.is_placeholder
                                 ? "0"
@@ -877,7 +877,7 @@ export default function Settings() {
                                 initial_balance: e.target.value,
                               })
                             }
-                            placeholder="0.00"
+                            placeholder="0.000000"
                             className={`h-9 ${
                               accountForm.is_placeholder
                                 ? "bg-gray-50 cursor-not-allowed"

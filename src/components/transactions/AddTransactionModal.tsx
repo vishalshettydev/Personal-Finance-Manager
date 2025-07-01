@@ -649,8 +649,8 @@ export function AddTransactionModal({
                 <Input
                   id="quantity"
                   type="number"
-                  step="0.001"
-                  min="0.001"
+                  step="0.00000001"
+                  min="0.00000001"
                   value={transactionForm.quantity}
                   onChange={(e) => {
                     const newQuantity = e.target.value;
@@ -660,7 +660,7 @@ export function AddTransactionModal({
                     });
                     calculateAmount(newQuantity, transactionForm.price);
                   }}
-                  placeholder="1"
+                  placeholder="1.00000000"
                   className="h-9"
                   required
                 />
@@ -672,8 +672,8 @@ export function AddTransactionModal({
                 <Input
                   id="price"
                   type="number"
-                  step="0.01"
-                  min="0.01"
+                  step="0.00000001"
+                  min="0.00000001"
                   value={transactionForm.price}
                   onChange={(e) => {
                     const newPrice = e.target.value;
@@ -683,7 +683,7 @@ export function AddTransactionModal({
                     });
                     calculateAmount(transactionForm.quantity, newPrice);
                   }}
-                  placeholder="0.00"
+                  placeholder="0.00000000"
                   className="h-9"
                   required
                 />
@@ -695,7 +695,7 @@ export function AddTransactionModal({
                 <Input
                   id="amount"
                   type="number"
-                  step="0.01"
+                  step="0.000001"
                   value={transactionForm.amount}
                   onChange={(e) =>
                     setTransactionForm({
@@ -703,7 +703,7 @@ export function AddTransactionModal({
                       amount: e.target.value,
                     })
                   }
-                  placeholder="0.00"
+                  placeholder="0.000000"
                   className="h-9 bg-gray-50"
                   readOnly
                 />
@@ -717,8 +717,8 @@ export function AddTransactionModal({
               <Input
                 id="amount"
                 type="number"
-                step="0.01"
-                min="0.01"
+                step="0.000001"
+                min="0.000001"
                 value={transactionForm.amount}
                 onChange={(e) =>
                   setTransactionForm({
@@ -726,7 +726,7 @@ export function AddTransactionModal({
                     amount: e.target.value,
                   })
                 }
-                placeholder="0.00"
+                placeholder="0.000000"
                 className="h-9"
                 required
               />

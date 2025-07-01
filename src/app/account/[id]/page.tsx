@@ -96,7 +96,7 @@ export default function AccountDetailPage() {
       style: "currency",
       currency: "INR",
       minimumFractionDigits: 2,
-      maximumFractionDigits: 6,
+      maximumFractionDigits: 2,
     }).format(amount);
   };
 

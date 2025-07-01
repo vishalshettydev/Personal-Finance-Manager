@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/auth";
 import { AccountPriceModal } from "./accounting/AccountPriceModal";
+import { useRouter } from "next/navigation";
 import {
   Building2,
   CreditCard,
@@ -72,6 +73,7 @@ export default function ChartOfAccounts({
   onPriceUpdated,
 }: ChartOfAccountsProps) {
   const { user } = useAuthStore();
+  const router = useRouter();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [accountsTree, setAccountsTree] = useState<TreeNode[]>([]);
   const [expandedNodes, setExpandedNodes] = useState<string[]>([]);
@@ -401,7 +403,14 @@ export default function ChartOfAccounts({
           className={`group flex items-center w-full py-1 px-2 text-left hover:bg-gray-50 transition-colors cursor-pointer ${
             level > 0 ? "border-l border-gray-200 ml-1" : ""
           } min-w-0`}
-          onClick={() => hasChildren && toggleNode(node.id)}
+          onClick={() => {
+            if (hasChildren) {
+              toggleNode(node.id);
+            } else if (!node.is_placeholder) {
+              // Navigate to account detail page for leaf nodes (actual accounts)
+              router.push(`/account/${node.id}`);
+            }
+          }}
         >
           {hasChildren ? (
             isExpanded ? (

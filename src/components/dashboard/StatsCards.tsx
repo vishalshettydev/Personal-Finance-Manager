@@ -20,9 +20,9 @@ interface StatsCardsProps {
   assets: number;
   liabilities: number;
   totalInvestments: number;
-  stocks: number;
-  mutualFunds: number;
-  bondsAndFDs: number;
+  totalInvested: number;
+  unrealizedProfit: number;
+  unrealizedProfitPercentage: number;
   loading?: boolean;
 }
 
@@ -34,9 +34,9 @@ export const StatsCards = ({
   assets,
   liabilities,
   totalInvestments,
-  stocks,
-  mutualFunds,
-  bondsAndFDs,
+  totalInvested,
+  unrealizedProfit,
+  unrealizedProfitPercentage,
   loading = false,
 }: StatsCardsProps) => {
   if (loading) {
@@ -155,21 +155,27 @@ export const StatsCards = ({
         </div>
         <div className="mt-4 pt-4 border-t border-gray-100">
           <div className="flex justify-between items-center text-sm">
-            <span className="text-gray-600">Stocks</span>
+            <span className="text-gray-600">Total Invested</span>
             <span className="font-semibold text-gray-900">
-              {formatINR(Math.abs(stocks))}
+              {formatINR(Math.abs(totalInvested))}
             </span>
           </div>
-          <div className="flex justify-between items-center mt-1 text-sm">
-            <span className="text-gray-600">Mutual Funds</span>
+          <div className="flex justify-between items-center mt-2 text-sm">
+            <span className="text-gray-600">Market Value</span>
             <span className="font-semibold text-gray-900">
-              {formatINR(Math.abs(mutualFunds))}
+              {formatINR(Math.abs(totalInvestments))}
             </span>
           </div>
-          <div className="flex justify-between items-center mt-1 text-sm">
-            <span className="text-gray-600">Bonds & FDs</span>
-            <span className="font-semibold text-gray-900">
-              {formatINR(Math.abs(bondsAndFDs))}
+          <div className="flex justify-between items-center mt-2 text-sm">
+            <span className="text-gray-600">Unrealized Profit</span>
+            <span
+              className={`font-semibold ${
+                unrealizedProfit >= 0 ? "text-green-600" : "text-red-600"
+              }`}
+            >
+              {unrealizedProfit >= 0 ? "+" : ""}
+              {formatINR(unrealizedProfit)} (
+              {unrealizedProfitPercentage.toFixed(2)}%)
             </span>
           </div>
         </div>

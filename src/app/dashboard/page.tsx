@@ -230,9 +230,9 @@ export default function Dashboard() {
               assets={stats.assets}
               liabilities={stats.liabilities}
               totalInvestments={stats.totalInvestments}
-              stocks={stats.stocks}
-              mutualFunds={stats.mutualFunds}
-              bondsAndFDs={stats.bondsAndFDs}
+              totalInvested={stats.totalInvested}
+              unrealizedProfit={stats.unrealizedProfit}
+              unrealizedProfitPercentage={stats.unrealizedProfitPercentage}
               loading={statsLoading}
             />
           )}

@@ -13,4 +13,4 @@ DROP TABLE IF EXISTS
 CASCADE;
 
 -- Then drop the enum
-DROP TYPE IF EXISTS entry_type_enum CASCADE;
+DROP TYPE IF EXISTS entry_side_enum CASCADE;

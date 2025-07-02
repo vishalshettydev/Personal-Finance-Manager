@@ -28,8 +28,9 @@ export const useTransactions = (userId: string | null) => {
             account_id,
             quantity,
             price,
-            entry_type,
+            entry_side,
             amount,
+            line_number,
             description,
             accounts (
               *,
@@ -54,9 +55,17 @@ export const useTransactions = (userId: string | null) => {
 
       if (transactionsError) throw transactionsError;
 
+      // Sort transaction entries by id for consistent display (until line_number is available)
+      const processedTransactions = transactionsData?.map((transaction) => ({
+        ...transaction,
+        transaction_entries: transaction.transaction_entries?.sort((a, b) =>
+          a.id.localeCompare(b.id)
+        ),
+      }));
+
       // Filter and categorize transactions
       const allTransactions =
-        transactionsData?.filter((transaction) => {
+        processedTransactions?.filter((transaction) => {
           const hasIncomeExpense = transaction.transaction_entries?.some(
             (entry) =>
               ["INCOME", "EXPENSE"].includes(
@@ -71,13 +80,14 @@ export const useTransactions = (userId: string | null) => {
               )
           );
 
-          // Include: 1) Income/Expense transactions, 2) Transfers between Asset/Liability accounts
+          // Include: 1) Income/Expense transactions, 2) Transfers between Asset/Liability accounts, 3) Split transactions
           const isTransfer =
             !hasIncomeExpense &&
             hasAssetLiability &&
-            transaction.transaction_entries?.length === 2;
+            (transaction.transaction_entries?.length === 2 ||
+              transaction.is_split);
 
-          return hasIncomeExpense || isTransfer;
+          return hasIncomeExpense || isTransfer || transaction.is_split;
         }) || [];
 
       setTransactions(allTransactions.slice(0, 100)); // Limit to 100 after filtering
@@ -107,12 +117,25 @@ export const useTransactions = (userId: string | null) => {
     []
   );
 
+  // Get transactions for a specific account (for account-specific views)
+  const getTransactionsForAccount = useCallback(
+    (accountId: string): TransactionData[] => {
+      return transactions.filter((transaction) =>
+        transaction.transaction_entries?.some(
+          (entry) => entry.account_id === accountId
+        )
+      );
+    },
+    [transactions]
+  );
+
   return {
     transactions,
     loading,
     error,
     fetchAllTransactions,
     getTransactionType,
+    getTransactionsForAccount,
     refetch: fetchAllTransactions,
   };
 };

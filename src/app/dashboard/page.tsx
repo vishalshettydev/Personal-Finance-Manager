@@ -7,6 +7,7 @@ import ChartOfAccounts from "@/components/ChartOfAccounts";
 import { TransactionList } from "@/components/transactions/TransactionList";
 import { StatsCards } from "@/components/dashboard/StatsCards";
 import { AddTransactionModal } from "@/components/transactions/AddTransactionModal";
+
 import { useTransactions } from "@/hooks/useTransactions";
 import { useAccounts } from "@/hooks/useAccounts";
 import { useDashboardStats } from "@/hooks/useDashboardStats";
@@ -204,14 +205,16 @@ export default function Dashboard() {
                 Here&rsquo;s an overview of your financial data.
               </p>
             </div>
-            <AddTransactionModal
-              userId={user.id}
-              accounts={accounts}
-              tags={tags}
-              onTransactionAdded={handleTransactionAdded}
-              onAccountsRefresh={handleAccountsRefresh}
-              onTagsRefresh={handleTagsRefresh}
-            />
+            <div className="flex gap-3">
+              <AddTransactionModal
+                userId={user.id}
+                accounts={accounts}
+                tags={tags}
+                onTransactionAdded={handleTransactionAdded}
+                onAccountsRefresh={handleAccountsRefresh}
+                onTagsRefresh={handleTagsRefresh}
+              />
+            </div>
           </div>
 
           {/* Quick Stats - Full Width */}

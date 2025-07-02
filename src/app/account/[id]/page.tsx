@@ -48,7 +48,7 @@ interface Transaction {
   created_at: string | null;
   transaction_entries: Array<{
     id: string;
-    entry_type: string;
+    entry_side: string;
     amount: number | null;
     quantity: number | null;
     account_id: string | null;
@@ -164,7 +164,7 @@ export default function AccountDetailPage() {
           created_at,
           transaction_entries!inner (
             id,
-            entry_type,
+            entry_side,
             amount,
             quantity,
             account_id
@@ -212,11 +212,11 @@ export default function AccountDetailPage() {
 
     transactions.forEach((transaction) => {
       transaction.transaction_entries.forEach((entry) => {
-        if (entry.entry_type === "CREDIT") {
+        if (entry.entry_side === "CREDIT") {
           // Money invested (buying)
           totalInvested += entry.amount || 0;
           totalUnits += entry.quantity || 0;
-        } else if (entry.entry_type === "DEBIT") {
+        } else if (entry.entry_side === "DEBIT") {
           // Money withdrawn (selling)
           totalInvested -= entry.amount || 0;
           totalUnits -= entry.quantity || 0;
@@ -436,11 +436,17 @@ export default function AccountDetailPage() {
                               <span>Ref: {transaction.reference_number}</span>
                             </>
                           )}
-                          {entry.entry_type && (
+                          {entry.entry_side && (
                             <>
                               <span>•</span>
-                              <span className="capitalize">
-                                {entry.entry_type.toLowerCase()}
+                              <span
+                                className={`inline-block px-2 py-1 rounded text-xs ${
+                                  entry.entry_side === "CREDIT"
+                                    ? "bg-green-100 text-green-800"
+                                    : "bg-red-100 text-red-800"
+                                }`}
+                              >
+                                {entry.entry_side.toLowerCase()}
                               </span>
                             </>
                           )}
@@ -454,12 +460,12 @@ export default function AccountDetailPage() {
                       <div className="text-right">
                         <div
                           className={`font-semibold ${
-                            entry.entry_type === "CREDIT"
+                            entry.entry_side === "CREDIT"
                               ? "text-green-600"
                               : "text-red-600"
                           }`}
                         >
-                          {entry.entry_type === "CREDIT" ? "+" : "-"}
+                          {entry.entry_side === "CREDIT" ? "+" : "-"}
                           {formatINR(Math.abs(entry.amount || 0))}
                         </div>
                       </div>

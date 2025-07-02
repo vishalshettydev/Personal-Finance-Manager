@@ -2,11 +2,6 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ========================
--- ENUMS
--- ========================
-CREATE TYPE entry_type_enum AS ENUM ('BUY', 'SELL', 'DEBIT', 'CREDIT');
-
--- ========================
 -- ACCOUNT TYPES
 -- ========================
 CREATE TABLE public.account_types (
@@ -110,9 +105,9 @@ CREATE TABLE public.transaction_entries (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   transaction_id UUID REFERENCES public.transactions(id),
   account_id UUID REFERENCES public.accounts(id),
+  entry_side VARCHAR NOT NULL CHECK (entry_side IN ('DEBIT', 'CREDIT')),
   quantity NUMERIC(20,8) DEFAULT 0,
   price NUMERIC(20,8) DEFAULT 0,
-  entry_type entry_type_enum NOT NULL,
   amount NUMERIC(20,6) DEFAULT 0,
   line_number INTEGER,
   description TEXT

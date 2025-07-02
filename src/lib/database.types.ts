@@ -11,22 +11,46 @@ export type Database = {
     Tables: {
       account_types: {
         Row: {
-          category: string;
+          category:
+            | "ASSET"
+            | "LIABILITY"
+            | "EQUITY"
+            | "INCOME"
+            | "EXPENSE"
+            | "SYSTEM";
           created_at: string | null;
+          description: string | null;
           id: string;
           name: string;
+          normal_balance: "DEBIT" | "CREDIT";
         };
         Insert: {
-          category: string;
+          category:
+            | "ASSET"
+            | "LIABILITY"
+            | "EQUITY"
+            | "INCOME"
+            | "EXPENSE"
+            | "SYSTEM";
           created_at?: string | null;
+          description?: string | null;
           id?: string;
           name: string;
+          normal_balance: "DEBIT" | "CREDIT";
         };
         Update: {
-          category?: string;
+          category?:
+            | "ASSET"
+            | "LIABILITY"
+            | "EQUITY"
+            | "INCOME"
+            | "EXPENSE"
+            | "SYSTEM";
           created_at?: string | null;
+          description?: string | null;
           id?: string;
           name?: string;
+          normal_balance?: "DEBIT" | "CREDIT";
         };
         Relationships: [];
       };
@@ -282,8 +306,9 @@ export type Database = {
           account_id: string | null;
           amount: number | null;
           description: string | null;
-          entry_type: "BUY" | "SELL" | "DEBIT" | "CREDIT";
+          entry_side: "DEBIT" | "CREDIT";
           id: string;
+          line_number: number | null;
           price: number | null;
           quantity: number | null;
           transaction_id: string | null;
@@ -292,8 +317,9 @@ export type Database = {
           account_id?: string | null;
           amount?: number | null;
           description?: string | null;
-          entry_type: "BUY" | "SELL" | "DEBIT" | "CREDIT";
+          entry_side: "DEBIT" | "CREDIT";
           id?: string;
+          line_number?: number | null;
           price?: number | null;
           quantity?: number | null;
           transaction_id?: string | null;
@@ -302,8 +328,9 @@ export type Database = {
           account_id?: string | null;
           amount?: number | null;
           description?: string | null;
-          entry_type?: "BUY" | "SELL" | "DEBIT" | "CREDIT";
+          entry_side?: "DEBIT" | "CREDIT";
           id?: string;
+          line_number?: number | null;
           price?: number | null;
           quantity?: number | null;
           transaction_id?: string | null;

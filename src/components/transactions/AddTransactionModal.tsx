@@ -568,7 +568,7 @@ export function AddTransactionModal({
             account_id: transactionForm.debit_account_id,
             quantity: 1,
             price: amount,
-            entry_type: "DEBIT" as const,
+            entry_side: "DEBIT" as const,
             amount: amount,
             line_number: 1,
             description: transactionForm.description,
@@ -578,7 +578,7 @@ export function AddTransactionModal({
             account_id: splitEntry.account_id,
             quantity: 1,
             price: splitEntry.amount,
-            entry_type: "CREDIT" as const,
+            entry_side: "CREDIT" as const,
             amount: splitEntry.amount,
             line_number: index + 2,
             description: splitEntry.description || transactionForm.description,
@@ -591,7 +591,7 @@ export function AddTransactionModal({
             account_id: transactionForm.debit_account_id, // From Account
             quantity: transactionForm.transaction_type === "investment" ? 1 : 1,
             price: amount,
-            entry_type: "DEBIT" as const,
+            entry_side: "DEBIT" as const,
             amount: amount,
             line_number: 1,
             description: transactionForm.description,
@@ -604,7 +604,7 @@ export function AddTransactionModal({
               transactionForm.transaction_type === "investment"
                 ? price
                 : amount,
-            entry_type: "CREDIT" as const,
+            entry_side: "CREDIT" as const,
             amount: amount,
             line_number: 2,
             description: transactionForm.description,

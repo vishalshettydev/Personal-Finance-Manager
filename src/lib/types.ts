@@ -16,9 +16,11 @@ export interface Account {
 
 export interface AccountType {
   id: string;
-  name: "Assets" | "Liabilities" | "Equity" | "Income" | "Expenses";
-  category: "DEBIT" | "CREDIT";
-  created_at: string;
+  name: string;
+  category: "ASSET" | "LIABILITY" | "EQUITY" | "INCOME" | "EXPENSE" | "SYSTEM";
+  normal_balance: "DEBIT" | "CREDIT";
+  description?: string | null;
+  created_at: string | null;
 }
 
 export interface Transaction {
@@ -41,7 +43,7 @@ export interface TransactionEntry {
   account_id: string;
   quantity: number;
   price: number;
-  entry_type: "BUY" | "SELL" | "DEBIT" | "CREDIT";
+  entry_side: "DEBIT" | "CREDIT";
   amount: number;
   line_number?: number;
   description?: string;
@@ -52,7 +54,7 @@ export interface TransactionEntryInput {
   account_id: string;
   quantity: number;
   price: number;
-  entry_type: "BUY" | "SELL" | "DEBIT" | "CREDIT";
+  entry_side: "DEBIT" | "CREDIT";
   amount: number;
   line_number?: number;
   description?: string;

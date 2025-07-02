@@ -28,8 +28,9 @@ export const useTransactions = (userId: string | null) => {
             account_id,
             quantity,
             price,
-            entry_type,
+            entry_side,
             amount,
+            line_number,
             description,
             accounts (
               *,

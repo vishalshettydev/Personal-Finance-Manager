@@ -71,17 +71,14 @@ export const useDashboardStats = (userId: string | null) => {
           `
           *,
           transaction_entries (
-            id,
-            account_id,
-            quantity,
-            price,
-            entry_type,
-            amount,
-            description,
+            *,
             accounts (
-              *,
+              id,
+              name,
               account_types (
-                category
+                name,
+                category,
+                normal_balance
               )
             )
           )
@@ -136,35 +133,33 @@ export const useDashboardStats = (userId: string | null) => {
       const accountUnits = new Map<string, number>();
 
       // First, calculate balance and units for each account from transaction entries
-      // Using simplified logic: CREDIT = money deposited (+), DEBIT = money withdrawn (-)
+      // Using proper accounting principles based on account type
       transactions?.forEach((transaction) => {
         transaction.transaction_entries?.forEach((entry) => {
           const accountId = entry.account_id;
           const amount = entry.amount || 0;
           const quantity = entry.quantity || 0;
-          const entryType = entry.entry_type;
+          const entrySide = entry.entry_side;
+          const accountType = entry.accounts?.account_types;
 
-          if (!accountId) return;
+          if (!accountId || !accountType) return;
 
           const currentBalance = accountBalances.get(accountId) || 0;
           const currentUnits = accountUnits.get(accountId) || 0;
 
-          // Simple logic: CREDIT adds to balance, DEBIT subtracts from balance
+          // Calculate balance change using proper accounting principles
           let balanceChange = 0;
           let unitsChange = 0;
 
-          if (entryType === "CREDIT") {
-            balanceChange = amount;
-            unitsChange = quantity; // Units bought
-          } else if (entryType === "DEBIT") {
-            balanceChange = -amount;
-            unitsChange = -quantity; // Units sold
-          } else if (entryType === "BUY") {
-            balanceChange = -amount; // Money going out
-            unitsChange = quantity; // Units bought
-          } else if (entryType === "SELL") {
-            balanceChange = amount; // Money coming in
-            unitsChange = -quantity; // Units sold
+          // For non-investment accounts, use standard accounting rules
+          if (accountType.normal_balance === "DEBIT") {
+            // DEBIT normal balance accounts: DEBIT increases (+), CREDIT decreases (-)
+            balanceChange = entrySide === "DEBIT" ? amount : -amount;
+            unitsChange = entrySide === "DEBIT" ? quantity : -quantity;
+          } else {
+            // CREDIT normal balance accounts: CREDIT increases (+), DEBIT decreases (-)
+            balanceChange = entrySide === "CREDIT" ? amount : -amount;
+            unitsChange = entrySide === "CREDIT" ? quantity : -quantity;
           }
 
           accountBalances.set(accountId, currentBalance + balanceChange);
@@ -229,23 +224,23 @@ export const useDashboardStats = (userId: string | null) => {
       }
 
       // Calculate income and expenses from transactions
-      // With simplified logic: track actual money flow to/from income and expense accounts
+      // With proper accounting principles: track credits to income and debits to expenses
       transactions?.forEach((transaction) => {
         transaction.transaction_entries?.forEach((entry) => {
           const category = entry.accounts?.account_types?.category;
           const amount = entry.amount || 0;
-          const entryType = entry.entry_type;
+          const entrySide = entry.entry_side;
 
           switch (category) {
             case "INCOME":
               // Income represents money you've earned - track credits to income accounts
-              if (entryType === "CREDIT") {
+              if (entrySide === "CREDIT") {
                 income += amount;
               }
               break;
             case "EXPENSE":
               // Expenses represent money you've spent - track debits to expense accounts
-              if (entryType === "DEBIT") {
+              if (entrySide === "DEBIT") {
                 expenses += amount;
               }
               break;
@@ -259,7 +254,7 @@ export const useDashboardStats = (userId: string | null) => {
         transactions?.forEach((transaction) => {
           transaction.transaction_entries?.forEach((entry) => {
             const amount = entry.amount || 0;
-            const entryType = entry.entry_type;
+            const entrySide = entry.entry_side;
             const accountCategory = entry.accounts?.account_types?.category;
 
             // Skip internal transfers between asset accounts
@@ -270,11 +265,21 @@ export const useDashboardStats = (userId: string | null) => {
               return;
             }
 
-            // Fixed logic: DEBIT = money coming in (income), CREDIT = money going out (expenses)
-            if (entryType === "DEBIT" && amount > 0) {
-              income += amount; // Money coming in
-            } else if (entryType === "CREDIT" && amount > 0) {
-              expenses += amount; // Money going out
+            // Follow proper accounting:
+            // Income accounts (CREDIT normal): CREDIT increases income
+            // Expense accounts (DEBIT normal): DEBIT increases expenses
+            if (
+              accountCategory === "INCOME" &&
+              entrySide === "CREDIT" &&
+              amount > 0
+            ) {
+              income += amount;
+            } else if (
+              accountCategory === "EXPENSE" &&
+              entrySide === "DEBIT" &&
+              amount > 0
+            ) {
+              expenses += amount;
             }
           });
         });
@@ -423,7 +428,7 @@ export const useDashboardStats = (userId: string | null) => {
                 .map((e) => ({
                   description: t.description,
                   account_category: e.accounts?.account_types?.category,
-                  entry_type: e.entry_type,
+                  entry_side: e.entry_side,
                   amount: e.amount,
                   account_name: e.accounts?.name,
                 })) || []

@@ -45,9 +45,9 @@ export const TransactionListItem = ({
 
   // Get debit and credit entries for display
   const debitEntries =
-    relevantEntries?.filter((entry) => entry.entry_type === "DEBIT") || [];
+    relevantEntries?.filter((entry) => entry.entry_side === "DEBIT") || [];
   const creditEntries =
-    relevantEntries?.filter((entry) => entry.entry_type === "CREDIT") || [];
+    relevantEntries?.filter((entry) => entry.entry_side === "CREDIT") || [];
 
   // Get account display text based on transaction type and split status
   const getAccountDisplayText = () => {
@@ -128,7 +128,7 @@ export const TransactionListItem = ({
         (entry) => entry.account_id === contextAccountId
       );
       if (contextEntry) {
-        const isPositive = contextEntry.entry_type === "CREDIT";
+        const isPositive = contextEntry.entry_side === "CREDIT";
         return {
           color: isPositive ? "text-green-600" : "text-red-600",
           prefix: isPositive ? "+" : "-",

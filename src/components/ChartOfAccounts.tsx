@@ -116,26 +116,39 @@ export default function ChartOfAccounts({
       try {
         const { data: entries, error } = await supabase
           .from("transaction_entries")
-          .select("entry_type, amount")
+          .select("entry_side, amount")
           .eq("account_id", accountId);
 
         if (error) throw error;
 
-        let balance = 0;
+        // Get account type information to determine normal balance
+        const { data: account } = await supabase
+          .from("accounts")
+          .select(
+            `
+            *,
+            account_type:account_types(*)
+          `
+          )
+          .eq("id", accountId)
+          .single();
 
+        if (!account?.account_type) {
+          return 0;
+        }
+
+        let balance = 0;
         entries?.forEach((entry) => {
           const amount = entry.amount || 0;
-          const entryType = entry.entry_type;
+          const entrySide = entry.entry_side;
 
-          // Apply simplified logic: CREDIT = money deposited (+), DEBIT = money withdrawn (-)
-          if (entryType === "CREDIT") {
-            balance += amount; // Money deposited/received
-          } else if (entryType === "DEBIT") {
-            balance -= amount; // Money withdrawn/spent
-          } else if (entryType === "BUY") {
-            balance -= amount; // Money going out to buy
-          } else if (entryType === "SELL") {
-            balance += amount; // Money coming in from sale
+          // Apply proper accounting principles based on account type
+          if (account.account_type?.normal_balance === "DEBIT") {
+            // DEBIT normal balance accounts: DEBIT increases (+), CREDIT decreases (-)
+            balance += entrySide === "DEBIT" ? amount : -amount;
+          } else {
+            // CREDIT normal balance accounts: CREDIT increases (+), DEBIT decreases (-)
+            balance += entrySide === "CREDIT" ? amount : -amount;
           }
         });
 
@@ -148,34 +161,50 @@ export default function ChartOfAccounts({
     []
   );
 
-  // Calculate total units for investment accounts
+  // Calculate units for investment accounts
   const calculateAccountUnits = useCallback(
     async (accountId: string): Promise<number> => {
       try {
         const { data: entries, error } = await supabase
           .from("transaction_entries")
-          .select("entry_type, quantity")
+          .select("entry_side, quantity")
           .eq("account_id", accountId);
 
         if (error) throw error;
 
-        let totalUnits = 0;
+        // Get account type information
+        const { data: account } = await supabase
+          .from("accounts")
+          .select(
+            `
+            *,
+            account_type:account_types(*)
+          `
+          )
+          .eq("id", accountId)
+          .single();
 
+        if (!account?.account_type) {
+          return 0;
+        }
+
+        let units = 0;
         entries?.forEach((entry) => {
           const quantity = entry.quantity || 0;
-          const entryType = entry.entry_type;
+          const entrySide = entry.entry_side;
 
-          // For investment accounts: CREDIT = buying units (+), DEBIT = selling units (-)
-          if (entryType === "CREDIT") {
-            totalUnits += quantity; // Units bought/received
-          } else if (entryType === "DEBIT") {
-            totalUnits -= quantity; // Units sold/withdrawn
+          // Apply proper accounting principles for units
+          if (account.account_type?.normal_balance === "DEBIT") {
+            // DEBIT normal balance accounts: DEBIT increases units (+), CREDIT decreases units (-)
+            units += entrySide === "DEBIT" ? quantity : -quantity;
+          } else {
+            // CREDIT normal balance accounts: CREDIT increases units (+), DEBIT decreases units (-)
+            units += entrySide === "CREDIT" ? quantity : -quantity;
           }
         });
 
-        return totalUnits;
+        return units;
       } catch {
-        // Silently handle errors and return 0 units
         return 0;
       }
     },

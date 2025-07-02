@@ -77,7 +77,7 @@ WITH opening_txn AS (
   RETURNING id
 )
 INSERT INTO public.transaction_entries (
-  transaction_id, account_id, quantity, price, entry_type, amount, description
+  transaction_id, account_id, quantity, price, entry_side, amount, description
 )
 VALUES
 -- Debit HDFC Bank
@@ -151,7 +151,7 @@ BEGIN
 
     -- Insert entries
     INSERT INTO public.transaction_entries (
-      transaction_id, account_id, quantity, price, entry_type, amount, description
+      transaction_id, account_id, quantity, price, entry_side, amount, description
     ) VALUES
     -- Debit HDFC Bank
     (

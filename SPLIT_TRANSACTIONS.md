@@ -80,7 +80,7 @@ interface SplitEntry {
   account_id: string;
   amount: number;
   description: string;
-  entry_type: "DEBIT" | "CREDIT";
+  entry_side: "DEBIT" | "CREDIT";
   line_number: number;
 }
 ```

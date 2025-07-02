@@ -26,7 +26,7 @@ export interface TransactionEntry {
   account_id: string | null;
   quantity: number | null;
   price: number | null;
-  entry_type: "BUY" | "SELL" | "DEBIT" | "CREDIT";
+  entry_side: "DEBIT" | "CREDIT";
   amount: number | null;
   line_number: number | null;
   description: string | null;
@@ -71,7 +71,7 @@ export interface SplitEntry {
   account_id: string;
   amount: number;
   description: string;
-  entry_type: "DEBIT" | "CREDIT";
+  entry_side: "DEBIT" | "CREDIT";
   line_number: number;
 }
 

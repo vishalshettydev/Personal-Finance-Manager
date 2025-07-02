@@ -28,6 +28,7 @@ export interface TransactionEntry {
   price: number | null;
   entry_type: "BUY" | "SELL" | "DEBIT" | "CREDIT";
   amount: number | null;
+  line_number: number | null;
   description: string | null;
   accounts: Account | null;
 }
@@ -50,6 +51,7 @@ export interface TransactionData {
   transaction_date: string;
   total_amount: number;
   notes: string | null;
+  is_split?: boolean | null;
   created_at: string | null;
   updated_at: string | null;
   transaction_entries: TransactionEntry[];
@@ -63,6 +65,27 @@ export interface TransactionTypeInfo {
   label: string;
 }
 
+// Split transaction entry for form handling
+export interface SplitEntry {
+  id?: string;
+  account_id: string;
+  amount: number;
+  description: string;
+  entry_type: "DEBIT" | "CREDIT";
+  line_number: number;
+}
+
+// Split transaction form data
+export interface SplitTransactionFormData {
+  description: string;
+  reference_number: string;
+  transaction_date: string;
+  notes: string;
+  primary_entry: SplitEntry;
+  split_entries: SplitEntry[];
+  selected_tags: Tag[];
+}
+
 // Database transaction with entries for pagination hook
 export interface DatabaseTransactionWithEntries {
   id: string;
@@ -72,6 +95,7 @@ export interface DatabaseTransactionWithEntries {
   transaction_date: string;
   total_amount: number;
   notes: string | null;
+  is_split: boolean | null;
   created_at: string | null;
   updated_at: string | null;
   entries: {
@@ -79,6 +103,7 @@ export interface DatabaseTransactionWithEntries {
     amount: number;
     is_debit: boolean;
     description: string | null;
+    line_number: number | null;
     account: {
       id: string;
       name: string;

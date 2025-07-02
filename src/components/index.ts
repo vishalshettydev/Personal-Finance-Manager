@@ -13,6 +13,7 @@ export { TransactionList } from "./transactions/TransactionList";
 export { TransactionListItem } from "./transactions/TransactionListItem";
 export { TransactionSearchFilters } from "./transactions/TransactionSearchFilters";
 export { EnhancedTransactionFilters } from "./transactions/EnhancedTransactionFilters";
+export { AddTransactionModal } from "./transactions/AddTransactionModal";
 
 // Dashboard components
 export { StatsCards } from "./dashboard/StatsCards";

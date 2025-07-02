@@ -101,6 +101,7 @@ CREATE TABLE public.transactions (
   transaction_date DATE NOT NULL,
   total_amount NUMERIC(20,6) NOT NULL,
   notes TEXT,
+  is_split BOOLEAN default false,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -113,6 +114,7 @@ CREATE TABLE public.transaction_entries (
   price NUMERIC(20,8) DEFAULT 0,
   entry_type entry_type_enum NOT NULL,
   amount NUMERIC(20,6) DEFAULT 0,
+  line_number INTEGER,
   description TEXT
 );
 

@@ -43,6 +43,7 @@ export interface TransactionEntry {
   price: number;
   entry_type: "BUY" | "SELL" | "DEBIT" | "CREDIT";
   amount: number;
+  line_number?: number;
   description?: string;
   account?: Account;
 }
@@ -53,6 +54,7 @@ export interface TransactionEntryInput {
   price: number;
   entry_type: "BUY" | "SELL" | "DEBIT" | "CREDIT";
   amount: number;
+  line_number?: number;
   description?: string;
 }
 

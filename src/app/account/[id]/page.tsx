@@ -35,6 +35,7 @@ interface Account {
     id: string;
     name: string;
     category: string;
+    normal_balance?: string;
   } | null;
 }
 
@@ -52,6 +53,14 @@ interface Transaction {
     amount: number | null;
     quantity: number | null;
     account_id: string | null;
+    accounts: {
+      id: string;
+      name: string;
+      account_types: {
+        name: string;
+        category: string;
+      } | null;
+    } | null;
   }>;
 }
 
@@ -63,6 +72,7 @@ export default function AccountDetailPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [currentPrice, setCurrentPrice] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [calculatedBalance, setCalculatedBalance] = useState<number>(0);
 
   const accountId = params?.id as string;
 
@@ -131,7 +141,8 @@ export default function AccountDetailPage() {
           account_types (
             id,
             name,
-            category
+            category,
+            normal_balance
           )
         `
         )
@@ -139,7 +150,7 @@ export default function AccountDetailPage() {
         .single();
 
       if (error) throw error;
-      setAccount(data);
+      setAccount(data as Account);
     } catch (error) {
       console.error("Error fetching account:", error);
       toast.error("Failed to load account details");
@@ -151,6 +162,26 @@ export default function AccountDetailPage() {
     if (!user || !accountId) return;
 
     try {
+      // First, get all transaction IDs that involve this account
+      const { data: accountTransactions, error: transactionIdsError } =
+        await supabase
+          .from("transaction_entries")
+          .select("transaction_id")
+          .eq("account_id", accountId);
+
+      if (transactionIdsError) throw transactionIdsError;
+
+      const transactionIds: string[] =
+        accountTransactions
+          ?.map((t) => t.transaction_id)
+          .filter((id): id is string => id !== null) || [];
+
+      if (transactionIds.length === 0) {
+        setTransactions([]);
+        return;
+      }
+
+      // Now get complete transaction data for these transactions
       const { data, error } = await supabase
         .from("transactions")
         .select(
@@ -162,16 +193,24 @@ export default function AccountDetailPage() {
           total_amount,
           notes,
           created_at,
-          transaction_entries!inner (
+          transaction_entries (
             id,
             entry_side,
             amount,
             quantity,
-            account_id
+            account_id,
+            accounts (
+              id,
+              name,
+              account_types (
+                name,
+                category
+              )
+            )
           )
         `
         )
-        .eq("transaction_entries.account_id", accountId)
+        .in("id", transactionIds)
         .order("transaction_date", { ascending: false });
 
       if (error) throw error;
@@ -179,6 +218,39 @@ export default function AccountDetailPage() {
     } catch (error) {
       console.error("Error fetching transactions:", error);
       toast.error("Failed to load transactions");
+    }
+  };
+
+  // Get the other account(s) involved in a transaction
+  const getOtherAccounts = (transaction: Transaction): string => {
+    // Get all entries for this transaction
+    const allEntries = transaction.transaction_entries;
+
+    // Find entries that are NOT for the current account
+    const otherEntries = allEntries.filter(
+      (entry) => entry.account_id !== accountId
+    );
+
+    if (otherEntries.length === 0) {
+      return "";
+    }
+
+    if (otherEntries.length === 1) {
+      // Single other account
+      return otherEntries[0].accounts?.name || "Unknown Account";
+    } else {
+      // Multiple other accounts (split transaction)
+      const accountNames = otherEntries
+        .map((entry) => entry.accounts?.name || "Unknown")
+        .filter((name, index, array) => array.indexOf(name) === index); // Remove duplicates
+
+      if (accountNames.length === 1) {
+        return accountNames[0];
+      } else if (accountNames.length === 2) {
+        return accountNames.join(" & ");
+      } else {
+        return `${accountNames[0]} & ${accountNames.length - 1} others`;
+      }
     }
   };
 
@@ -212,17 +284,20 @@ export default function AccountDetailPage() {
 
     transactions.forEach((transaction) => {
       transaction.transaction_entries.forEach((entry) => {
-        // For investment accounts (ASSET accounts with DEBIT normal balance):
-        // DEBIT = Money invested (buying) - increases asset
-        // CREDIT = Money withdrawn (selling) - decreases asset
-        if (entry.entry_side === "DEBIT") {
-          // Money invested (buying)
-          totalInvested += entry.amount || 0;
-          totalUnits += entry.quantity || 0;
-        } else if (entry.entry_side === "CREDIT") {
-          // Money withdrawn (selling)
-          totalInvested -= entry.amount || 0;
-          totalUnits -= entry.quantity || 0;
+        // Only consider entries for the current investment account
+        if (entry.account_id === accountId) {
+          // For investment accounts (ASSET accounts with DEBIT normal balance):
+          // DEBIT = Money invested (buying) - increases asset
+          // CREDIT = Money withdrawn (selling) - decreases asset
+          if (entry.entry_side === "DEBIT") {
+            // Money invested (buying)
+            totalInvested += entry.amount || 0;
+            totalUnits += entry.quantity || 0;
+          } else if (entry.entry_side === "CREDIT") {
+            // Money withdrawn (selling)
+            totalInvested -= entry.amount || 0;
+            totalUnits -= entry.quantity || 0;
+          }
         }
       });
     });
@@ -241,6 +316,61 @@ export default function AccountDetailPage() {
     };
   };
 
+  // Calculate account balance from transaction entries
+  const calculateAccountBalance = async () => {
+    if (!user || !accountId) return 0;
+
+    try {
+      const { data: entries, error } = await supabase
+        .from("transaction_entries")
+        .select("entry_side, amount")
+        .eq("account_id", accountId);
+
+      if (error) throw error;
+
+      // Get account type information to determine normal balance
+      const { data: accountData } = await supabase
+        .from("accounts")
+        .select(
+          `
+          *,
+          account_types (
+            id,
+            name,
+            category,
+            normal_balance
+          )
+        `
+        )
+        .eq("id", accountId)
+        .single();
+
+      if (!accountData?.account_types) {
+        return 0;
+      }
+
+      let balance = 0;
+      entries?.forEach((entry) => {
+        const amount = entry.amount || 0;
+        const entrySide = entry.entry_side;
+
+        // Apply proper accounting principles based on account type
+        if (accountData.account_types?.normal_balance === "DEBIT") {
+          // DEBIT normal balance accounts: DEBIT increases (+), CREDIT decreases (-)
+          balance += entrySide === "DEBIT" ? amount : -amount;
+        } else {
+          // CREDIT normal balance accounts: CREDIT increases (+), DEBIT decreases (-)
+          balance += entrySide === "CREDIT" ? amount : -amount;
+        }
+      });
+
+      return balance;
+    } catch (error) {
+      console.error("Error calculating account balance:", error);
+      return 0;
+    }
+  };
+
   useEffect(() => {
     if (!user && loading) {
       initialize();
@@ -253,6 +383,11 @@ export default function AccountDetailPage() {
         setIsLoading(true);
         await fetchAccount();
         await fetchTransactions();
+
+        // Calculate the actual balance from transaction entries
+        const balance = await calculateAccountBalance();
+        setCalculatedBalance(balance);
+
         setIsLoading(false);
       };
       loadData();
@@ -398,7 +533,7 @@ export default function AccountDetailPage() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-gray-900">
-                {formatINR(Math.abs(account.balance || 0))}
+                {formatINR(calculatedBalance)}
               </div>
               {account.description && (
                 <p className="text-gray-600 mt-2">{account.description}</p>
@@ -420,7 +555,12 @@ export default function AccountDetailPage() {
             ) : (
               <div className="space-y-3">
                 {transactions.map((transaction) => {
-                  const entry = transaction.transaction_entries[0];
+                  // Find the entry for the current account
+                  const entry =
+                    transaction.transaction_entries.find(
+                      (e) => e.account_id === accountId
+                    ) || transaction.transaction_entries[0];
+
                   return (
                     <div
                       key={transaction.id}
@@ -440,39 +580,26 @@ export default function AccountDetailPage() {
                               <span>Ref: {transaction.reference_number}</span>
                             </>
                           )}
-                          {entry.entry_side && (
-                            <>
-                              <span>•</span>
-                              <span
-                                className={`inline-block px-2 py-1 rounded text-xs ${
-                                  // For investment/asset accounts: DEBIT = positive (green), CREDIT = negative (red)
-                                  // For other accounts: keep traditional logic
-                                  isInvestmentAccount(account)
-                                    ? entry.entry_side === "DEBIT"
-                                      ? "bg-green-100 text-green-800"
-                                      : "bg-red-100 text-red-800"
-                                    : entry.entry_side === "CREDIT"
-                                    ? "bg-green-100 text-green-800"
-                                    : "bg-red-100 text-red-800"
-                                }`}
-                              >
-                                {entry.entry_side.toLowerCase()}
-                              </span>
-                            </>
-                          )}
                         </div>
-                        {isInvestmentAccount(account) && entry.quantity && (
-                          <div className="text-sm text-blue-600">
-                            {entry.quantity.toFixed(3)} units
-                          </div>
-                        )}
+                        {/* Show the other account involved */}
+                        <div className="text-sm text-blue-600">
+                          {getOtherAccounts(transaction)}
+                        </div>
+                        {isInvestmentAccount(account) &&
+                          entry.quantity &&
+                          entry.quantity > 0 && (
+                            <div className="text-sm text-purple-600">
+                              {entry.quantity.toFixed(3)} units
+                            </div>
+                          )}
                       </div>
                       <div className="text-right">
                         <div
                           className={`font-semibold ${
-                            // For investment/asset accounts: DEBIT = positive (green), CREDIT = negative (red)
-                            // For other accounts: keep traditional logic
-                            isInvestmentAccount(account)
+                            // For all account types, use proper accounting logic
+                            // DEBIT normal balance accounts (Assets, Expenses): DEBIT = +, CREDIT = -
+                            // CREDIT normal balance accounts (Liabilities, Equity, Income): CREDIT = +, DEBIT = -
+                            account.account_types?.normal_balance === "DEBIT"
                               ? entry.entry_side === "DEBIT"
                                 ? "text-green-600"
                                 : "text-red-600"
@@ -481,7 +608,7 @@ export default function AccountDetailPage() {
                               : "text-red-600"
                           }`}
                         >
-                          {isInvestmentAccount(account)
+                          {account.account_types?.normal_balance === "DEBIT"
                             ? entry.entry_side === "DEBIT"
                               ? "+"
                               : "-"

@@ -60,8 +60,8 @@ WITH new_transaction AS (
 INSERT INTO public.transaction_entries (transaction_id, account_id, entry_side, amount, description)
 SELECT nt.id, acc.id,
   CASE acc.name
-    WHEN 'Food' THEN 'CREDIT'::entry_side_enum
-    WHEN 'Bank: HDFC' THEN 'DEBIT'::entry_side_enum
+    WHEN 'Food' THEN 'CREDIT'
+    WHEN 'Bank: HDFC' THEN 'DEBIT'
   END,
   1000, 'Food Delivery'
 FROM new_transaction nt
@@ -77,8 +77,8 @@ WITH new_transaction AS (
 INSERT INTO public.transaction_entries (transaction_id, account_id, entry_side, amount, description)
 SELECT nt.id, acc.id,
   CASE acc.name
-    WHEN 'Food' THEN 'CREDIT'::entry_side_enum
-    WHEN 'Credit Card' THEN 'DEBIT'::entry_side_enum
+    WHEN 'Food' THEN 'CREDIT'
+    WHEN 'Credit Card' THEN 'DEBIT'
   END,
   500, 'Credit Card Spend'
 FROM new_transaction nt
@@ -94,8 +94,8 @@ WITH new_transaction AS (
 INSERT INTO public.transaction_entries (transaction_id, account_id, entry_side, amount, description)
 SELECT nt.id, acc.id,
   CASE acc.name
-    WHEN 'Freelancing' THEN 'DEBIT'::entry_side_enum
-    WHEN 'Cash in Hand' THEN 'CREDIT'::entry_side_enum
+    WHEN 'Freelancing' THEN 'DEBIT'
+    WHEN 'Cash in Hand' THEN 'CREDIT'
   END,
   2500, 'Freelancing Payment'
 FROM new_transaction nt
@@ -111,8 +111,8 @@ WITH new_transaction AS (
 INSERT INTO public.transaction_entries (transaction_id, account_id, entry_side, amount, description)
 SELECT nt.id, acc.id,
   CASE acc.name
-    WHEN 'Insurance' THEN 'CREDIT'::entry_side_enum
-    WHEN 'Bank: HDFC' THEN 'DEBIT'::entry_side_enum
+    WHEN 'Insurance' THEN 'CREDIT'
+    WHEN 'Bank: HDFC' THEN 'DEBIT'
   END,
   2000, 'Insurance Premium'
 FROM new_transaction nt
@@ -128,8 +128,8 @@ WITH new_transaction AS (
 INSERT INTO public.transaction_entries (transaction_id, account_id, entry_side, amount, description)
 SELECT nt.id, acc.id,
   CASE acc.name
-    WHEN 'Utility Bills' THEN 'CREDIT'::entry_side_enum
-    WHEN 'Bank: HDFC' THEN 'DEBIT'::entry_side_enum
+    WHEN 'Utility Bills' THEN 'CREDIT'
+    WHEN 'Bank: HDFC' THEN 'DEBIT'
   END,
   800, 'Paid Utility Bill'
 FROM new_transaction nt
@@ -145,8 +145,8 @@ WITH new_transaction AS (
 INSERT INTO public.transaction_entries (transaction_id, account_id, entry_side, amount, description)
 SELECT nt.id, acc.id,
   CASE acc.name
-    WHEN 'Pharmacy' THEN 'CREDIT'::entry_side_enum
-    WHEN 'Bank: HDFC' THEN 'DEBIT'::entry_side_enum
+    WHEN 'Pharmacy' THEN 'CREDIT'
+    WHEN 'Bank: HDFC' THEN 'DEBIT'
   END,
   450, 'Bought Medicines'
 FROM new_transaction nt
@@ -162,8 +162,8 @@ WITH new_transaction AS (
 INSERT INTO public.transaction_entries (transaction_id, account_id, entry_side, amount, description)
 SELECT nt.id, acc.id,
   CASE acc.name
-    WHEN 'Entertainment' THEN 'CREDIT'::entry_side_enum
-    WHEN 'Bank: HDFC' THEN 'DEBIT'::entry_side_enum
+    WHEN 'Entertainment' THEN 'CREDIT'
+    WHEN 'Bank: HDFC' THEN 'DEBIT'
   END,
   400, 'Movie + Snacks'
 FROM new_transaction nt
@@ -179,8 +179,8 @@ WITH new_transaction AS (
 INSERT INTO public.transaction_entries (transaction_id, account_id, entry_side, amount, description)
 SELECT nt.id, acc.id,
   CASE acc.name
-    WHEN 'Personal' THEN 'CREDIT'::entry_side_enum
-    WHEN 'Bank: HDFC' THEN 'DEBIT'::entry_side_enum
+    WHEN 'Personal' THEN 'CREDIT'
+    WHEN 'Bank: HDFC' THEN 'DEBIT'
   END,
   800, 'Personal Shopping'
 FROM new_transaction nt
@@ -196,8 +196,8 @@ WITH new_transaction AS (
 INSERT INTO public.transaction_entries (transaction_id, account_id, entry_side, amount, description)
 SELECT nt.id, acc.id,
   CASE acc.name
-    WHEN 'Kid Education' THEN 'CREDIT'::entry_side_enum
-    WHEN 'Bank: HDFC' THEN 'DEBIT'::entry_side_enum
+    WHEN 'Kid Education' THEN 'CREDIT'
+    WHEN 'Bank: HDFC' THEN 'DEBIT'
   END,
   3000, 'Kids School Fees'
 FROM new_transaction nt
@@ -213,8 +213,8 @@ WITH new_transaction AS (
 INSERT INTO public.transaction_entries (transaction_id, account_id, entry_side, amount, description)
 SELECT nt.id, acc.id,
   CASE acc.name
-    WHEN 'Interest (Bank)' THEN 'DEBIT'::entry_side_enum
-    WHEN 'Bank: HDFC' THEN 'CREDIT'::entry_side_enum
+    WHEN 'Interest (Bank)' THEN 'DEBIT'
+    WHEN 'Bank: HDFC' THEN 'CREDIT'
   END,
   150, 'Bank Interest Received'
 FROM new_transaction nt
@@ -230,8 +230,8 @@ WITH new_transaction AS (
 INSERT INTO public.transaction_entries (transaction_id, account_id, entry_side, amount, description)
 SELECT nt.id, acc.id,
   CASE acc.name
-    WHEN 'Dividends' THEN 'DEBIT'::entry_side_enum
-    WHEN 'Bank: HDFC' THEN 'CREDIT'::entry_side_enum
+    WHEN 'Dividends' THEN 'DEBIT'
+    WHEN 'Bank: HDFC' THEN 'CREDIT'
   END,
   200, 'Dividend Received'
 FROM new_transaction nt
@@ -247,8 +247,8 @@ WITH new_transaction AS (
 INSERT INTO public.transaction_entries (transaction_id, account_id, entry_side, amount, description)
 SELECT nt.id, acc.id,
   CASE acc.name
-    WHEN 'Cashback' THEN 'DEBIT'::entry_side_enum
-    WHEN 'Bank: HDFC' THEN 'CREDIT'::entry_side_enum
+    WHEN 'Cashback' THEN 'DEBIT'
+    WHEN 'Bank: HDFC' THEN 'CREDIT'
   END,
   100, 'Cashback from UPI'
 FROM new_transaction nt
@@ -264,8 +264,8 @@ WITH new_transaction AS (
 INSERT INTO public.transaction_entries (transaction_id, account_id, entry_side, amount, description)
 SELECT nt.id, acc.id,
   CASE acc.name
-    WHEN 'Home Loan' THEN 'DEBIT'::entry_side_enum
-    WHEN 'Home Property' THEN 'CREDIT'::entry_side_enum
+    WHEN 'Home Loan' THEN 'DEBIT'
+    WHEN 'Home Property' THEN 'CREDIT'
   END,
   500000, 'Home Loan Sanctioned'
 FROM new_transaction nt
@@ -281,8 +281,8 @@ WITH new_transaction AS (
 INSERT INTO public.transaction_entries (transaction_id, account_id, entry_side, amount, description)
 SELECT nt.id, acc.id,
   CASE acc.name
-    WHEN 'Bank: HDFC' THEN 'DEBIT'::entry_side_enum
-    WHEN 'Home Loan' THEN 'CREDIT'::entry_side_enum
+    WHEN 'Bank: HDFC' THEN 'DEBIT'
+    WHEN 'Home Loan' THEN 'CREDIT'
   END,
   18000, 'EMI Payment (Principal)'
 FROM new_transaction nt
@@ -298,8 +298,8 @@ WITH new_transaction AS (
 INSERT INTO public.transaction_entries (transaction_id, account_id, entry_side, amount, description)
 SELECT nt.id, acc.id,
   CASE acc.name
-    WHEN 'Bank: HDFC' THEN 'DEBIT'::entry_side_enum
-    WHEN 'Loan Interest' THEN 'CREDIT'::entry_side_enum
+    WHEN 'Bank: HDFC' THEN 'DEBIT'
+    WHEN 'Loan Interest' THEN 'CREDIT'
   END,
   2000, 'EMI Payment (Interest)'
 FROM new_transaction nt
@@ -331,7 +331,7 @@ SELECT nt.id, acc.id,
   CASE acc.name
     WHEN 'Quant ELSS' THEN 'BUY'
     WHEN 'Bank: HDFC' THEN 'CREDIT'
-  END::entry_side_enum,
+  END,
   'Buy 10 units @200'
 FROM new_transaction nt
 CROSS JOIN public.accounts acc
@@ -361,7 +361,7 @@ SELECT nt.id, acc.id,
   CASE acc.name
     WHEN 'Quant ELSS' THEN 'BUY'
     WHEN 'Bank: HDFC' THEN 'CREDIT'
-  END::entry_side_enum,
+  END,
   'Buy 5 units @210'
 FROM new_transaction nt
 CROSS JOIN public.accounts acc
@@ -391,7 +391,7 @@ SELECT nt.id, acc.id,
   CASE acc.name
     WHEN 'Quant ELSS' THEN 'SELL'
     WHEN 'Bank: HDFC' THEN 'DEBIT'
-  END::entry_side_enum,
+  END,
   'Sell 10 units @220'
 FROM new_transaction nt
 CROSS JOIN public.accounts acc

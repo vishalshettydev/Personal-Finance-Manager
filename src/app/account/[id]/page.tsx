@@ -203,7 +203,7 @@ export default function AccountDetailPage() {
     }
   };
 
-  // Calculate investment metrics
+  // Calculate investment metrics using proper accounting principles
   const calculateInvestmentMetrics = () => {
     if (!account || !isInvestmentAccount(account)) return null;
 
@@ -212,11 +212,14 @@ export default function AccountDetailPage() {
 
     transactions.forEach((transaction) => {
       transaction.transaction_entries.forEach((entry) => {
-        if (entry.entry_side === "CREDIT") {
+        // For investment accounts (ASSET accounts with DEBIT normal balance):
+        // DEBIT = Money invested (buying) - increases asset
+        // CREDIT = Money withdrawn (selling) - decreases asset
+        if (entry.entry_side === "DEBIT") {
           // Money invested (buying)
           totalInvested += entry.amount || 0;
           totalUnits += entry.quantity || 0;
-        } else if (entry.entry_side === "DEBIT") {
+        } else if (entry.entry_side === "CREDIT") {
           // Money withdrawn (selling)
           totalInvested -= entry.amount || 0;
           totalUnits -= entry.quantity || 0;
@@ -224,7 +227,8 @@ export default function AccountDetailPage() {
       });
     });
 
-    const currentValue = currentPrice ? totalUnits * currentPrice : 0;
+    const currentValue =
+      currentPrice && totalUnits > 0 ? totalUnits * currentPrice : 0;
     const gain = currentValue - totalInvested;
     const gainPercentage = totalInvested > 0 ? (gain / totalInvested) * 100 : 0;
 
@@ -331,7 +335,7 @@ export default function AccountDetailPage() {
               </CardHeader>
               <CardContent className="pt-0">
                 <div className="text-2xl font-bold text-gray-900">
-                  {formatINR(Math.abs(investmentMetrics.totalInvested))}
+                  {formatINR(investmentMetrics.totalInvested)}
                 </div>
               </CardContent>
             </Card>
@@ -441,7 +445,13 @@ export default function AccountDetailPage() {
                               <span>•</span>
                               <span
                                 className={`inline-block px-2 py-1 rounded text-xs ${
-                                  entry.entry_side === "CREDIT"
+                                  // For investment/asset accounts: DEBIT = positive (green), CREDIT = negative (red)
+                                  // For other accounts: keep traditional logic
+                                  isInvestmentAccount(account)
+                                    ? entry.entry_side === "DEBIT"
+                                      ? "bg-green-100 text-green-800"
+                                      : "bg-red-100 text-red-800"
+                                    : entry.entry_side === "CREDIT"
                                     ? "bg-green-100 text-green-800"
                                     : "bg-red-100 text-red-800"
                                 }`}
@@ -460,12 +470,24 @@ export default function AccountDetailPage() {
                       <div className="text-right">
                         <div
                           className={`font-semibold ${
-                            entry.entry_side === "CREDIT"
+                            // For investment/asset accounts: DEBIT = positive (green), CREDIT = negative (red)
+                            // For other accounts: keep traditional logic
+                            isInvestmentAccount(account)
+                              ? entry.entry_side === "DEBIT"
+                                ? "text-green-600"
+                                : "text-red-600"
+                              : entry.entry_side === "CREDIT"
                               ? "text-green-600"
                               : "text-red-600"
                           }`}
                         >
-                          {entry.entry_side === "CREDIT" ? "+" : "-"}
+                          {isInvestmentAccount(account)
+                            ? entry.entry_side === "DEBIT"
+                              ? "+"
+                              : "-"
+                            : entry.entry_side === "CREDIT"
+                            ? "+"
+                            : "-"}
                           {formatINR(Math.abs(entry.amount || 0))}
                         </div>
                       </div>

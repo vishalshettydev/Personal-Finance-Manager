@@ -27,7 +27,7 @@ export const TransactionListItem = ({
     if (contextAccountId && isSplitTransaction) {
       // When viewing from specific account context, show only relevant entries
       return AccountingEngine.getTransactionEntriesForAccount(
-        transaction,
+        { ...transaction, is_split: transaction.is_split ?? false },
         contextAccountId
       );
     }
@@ -128,7 +128,22 @@ export const TransactionListItem = ({
         (entry) => entry.account_id === contextAccountId
       );
       if (contextEntry) {
-        const isPositive = contextEntry.entry_side === "CREDIT";
+        // Use proper accounting principles based on account category
+        const accountCategory = contextEntry.accounts?.account_types?.category;
+        let isPositive = false;
+
+        // Determine normal balance from category
+        const isDebitNormalBalance =
+          accountCategory === "ASSET" || accountCategory === "EXPENSE";
+
+        if (isDebitNormalBalance) {
+          // DEBIT normal balance accounts (Assets, Expenses): DEBIT increases (+), CREDIT decreases (-)
+          isPositive = contextEntry.entry_side === "DEBIT";
+        } else {
+          // CREDIT normal balance accounts (Liabilities, Equity, Income): CREDIT increases (+), DEBIT decreases (-)
+          isPositive = contextEntry.entry_side === "CREDIT";
+        }
+
         return {
           color: isPositive ? "text-green-600" : "text-red-600",
           prefix: isPositive ? "+" : "-",

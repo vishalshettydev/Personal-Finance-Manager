@@ -56,7 +56,7 @@ interface AccountType {
   name: string;
   category: string;
   normal_balance?: string;
-  description?: string;
+  description?: string | null;
   created_at?: string | null;
 }
 

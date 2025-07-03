@@ -5,6 +5,9 @@ interface AccountType {
   id: string;
   name: string;
   category: string;
+  normal_balance?: "DEBIT" | "CREDIT";
+  description?: string | null;
+  created_at?: string | null;
 }
 
 export interface Account {

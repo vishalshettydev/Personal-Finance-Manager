@@ -387,6 +387,7 @@ export type Database = {
           created_at: string | null;
           description: string;
           id: string;
+          is_split: boolean | null;
           notes: string | null;
           reference_number: string | null;
           total_amount: number;
@@ -398,6 +399,7 @@ export type Database = {
           created_at?: string | null;
           description: string;
           id?: string;
+          is_split?: boolean | null;
           notes?: string | null;
           reference_number?: string | null;
           total_amount: number;
@@ -409,6 +411,7 @@ export type Database = {
           created_at?: string | null;
           description?: string;
           id?: string;
+          is_split?: boolean | null;
           notes?: string | null;
           reference_number?: string | null;
           total_amount?: number;

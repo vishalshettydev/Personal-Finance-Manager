@@ -6,11 +6,11 @@ WITH new_transaction AS (
   VALUES ('6bbc2fe7-5de6-4d82-a402-3ee8251604dc', 'Opening Balance', '2025-06-01', 2000)
   RETURNING id
 )
-INSERT INTO public.transaction_entries (transaction_id, account_id, entry_side, amount, description)
+INSERT INTO public.transaction_entries (transaction_id, account_id, entry_type, amount, description)
 SELECT nt.id, acc.id,
   CASE acc.name
-    WHEN 'Opening Balance' THEN 'DEBIT'
-    WHEN 'Bank: HDFC' THEN 'CREDIT'
+    WHEN 'Opening Balance' THEN 'CREDIT'::entry_type_enum
+    WHEN 'Bank: HDFC' THEN 'DEBIT'::entry_type_enum
   END,
   2000, 'Opening Balance'
 FROM new_transaction nt
@@ -23,11 +23,11 @@ WITH new_transaction AS (
   VALUES ('6bbc2fe7-5de6-4d82-a402-3ee8251604dc', 'Salary Credited', '2025-06-02', 32000)
   RETURNING id
 )
-INSERT INTO public.transaction_entries (transaction_id, account_id, entry_side, amount, description)
+INSERT INTO public.transaction_entries (transaction_id, account_id, entry_type, amount, description)
 SELECT nt.id, acc.id,
   CASE acc.name
-    WHEN 'Salary' THEN 'DEBIT'
-    WHEN 'Bank: HDFC' THEN 'CREDIT'
+    WHEN 'Salary' THEN 'CREDIT'::entry_type_enum
+    WHEN 'Bank: HDFC' THEN 'DEBIT'::entry_type_enum
   END,
   32000, 'Salary Credited'
 FROM new_transaction nt
@@ -40,11 +40,11 @@ WITH new_transaction AS (
   VALUES ('6bbc2fe7-5de6-4d82-a402-3ee8251604dc', 'Paid Rent', '2025-06-03', 5000)
   RETURNING id
 )
-INSERT INTO public.transaction_entries (transaction_id, account_id, entry_side, amount, description)
+INSERT INTO public.transaction_entries (transaction_id, account_id, entry_type, amount, description)
 SELECT nt.id, acc.id,
   CASE acc.name
-    WHEN 'Rent' THEN 'CREDIT'
-    WHEN 'Bank: HDFC' THEN 'DEBIT'
+    WHEN 'Rent' THEN 'DEBIT'::entry_type_enum
+    WHEN 'Bank: HDFC' THEN 'CREDIT'::entry_type_enum
   END,
   5000, 'Paid Rent'
 FROM new_transaction nt
@@ -57,11 +57,11 @@ WITH new_transaction AS (
   VALUES ('6bbc2fe7-5de6-4d82-a402-3ee8251604dc', 'Food Delivery', '2025-06-04', 1000)
   RETURNING id
 )
-INSERT INTO public.transaction_entries (transaction_id, account_id, entry_side, amount, description)
+INSERT INTO public.transaction_entries (transaction_id, account_id, entry_type, amount, description)
 SELECT nt.id, acc.id,
   CASE acc.name
-    WHEN 'Food' THEN 'CREDIT'
-    WHEN 'Bank: HDFC' THEN 'DEBIT'
+    WHEN 'Food' THEN 'DEBIT'::entry_type_enum
+    WHEN 'Bank: HDFC' THEN 'CREDIT'::entry_type_enum
   END,
   1000, 'Food Delivery'
 FROM new_transaction nt
@@ -74,11 +74,11 @@ WITH new_transaction AS (
   VALUES ('6bbc2fe7-5de6-4d82-a402-3ee8251604dc', 'Credit Card Spend', '2025-06-05', 500)
   RETURNING id
 )
-INSERT INTO public.transaction_entries (transaction_id, account_id, entry_side, amount, description)
+INSERT INTO public.transaction_entries (transaction_id, account_id, entry_type, amount, description)
 SELECT nt.id, acc.id,
   CASE acc.name
-    WHEN 'Food' THEN 'CREDIT'
-    WHEN 'Credit Card' THEN 'DEBIT'
+    WHEN 'Food' THEN 'DEBIT'::entry_type_enum
+    WHEN 'Credit Card' THEN 'CREDIT'::entry_type_enum
   END,
   500, 'Credit Card Spend'
 FROM new_transaction nt
@@ -91,11 +91,11 @@ WITH new_transaction AS (
   VALUES ('6bbc2fe7-5de6-4d82-a402-3ee8251604dc', 'Freelancing Payment', '2025-06-06', 2500)
   RETURNING id
 )
-INSERT INTO public.transaction_entries (transaction_id, account_id, entry_side, amount, description)
+INSERT INTO public.transaction_entries (transaction_id, account_id, entry_type, amount, description)
 SELECT nt.id, acc.id,
   CASE acc.name
-    WHEN 'Freelancing' THEN 'DEBIT'
-    WHEN 'Cash in Hand' THEN 'CREDIT'
+    WHEN 'Freelancing' THEN 'CREDIT'::entry_type_enum
+    WHEN 'Cash in Hand' THEN 'DEBIT'::entry_type_enum
   END,
   2500, 'Freelancing Payment'
 FROM new_transaction nt
@@ -108,11 +108,11 @@ WITH new_transaction AS (
   VALUES ('6bbc2fe7-5de6-4d82-a402-3ee8251604dc', 'Insurance Premium', '2025-06-07', 2000)
   RETURNING id
 )
-INSERT INTO public.transaction_entries (transaction_id, account_id, entry_side, amount, description)
+INSERT INTO public.transaction_entries (transaction_id, account_id, entry_type, amount, description)
 SELECT nt.id, acc.id,
   CASE acc.name
-    WHEN 'Insurance' THEN 'CREDIT'
-    WHEN 'Bank: HDFC' THEN 'DEBIT'
+    WHEN 'Insurance' THEN 'DEBIT'::entry_type_enum
+    WHEN 'Bank: HDFC' THEN 'CREDIT'::entry_type_enum
   END,
   2000, 'Insurance Premium'
 FROM new_transaction nt
@@ -125,11 +125,11 @@ WITH new_transaction AS (
   VALUES ('6bbc2fe7-5de6-4d82-a402-3ee8251604dc', 'Paid Utility Bill', '2025-06-08', 800)
   RETURNING id
 )
-INSERT INTO public.transaction_entries (transaction_id, account_id, entry_side, amount, description)
+INSERT INTO public.transaction_entries (transaction_id, account_id, entry_type, amount, description)
 SELECT nt.id, acc.id,
   CASE acc.name
-    WHEN 'Utility Bills' THEN 'CREDIT'
-    WHEN 'Bank: HDFC' THEN 'DEBIT'
+    WHEN 'Utility Bills' THEN 'DEBIT'::entry_type_enum
+    WHEN 'Bank: HDFC' THEN 'CREDIT'::entry_type_enum
   END,
   800, 'Paid Utility Bill'
 FROM new_transaction nt
@@ -142,11 +142,11 @@ WITH new_transaction AS (
   VALUES ('6bbc2fe7-5de6-4d82-a402-3ee8251604dc', 'Bought Medicines', '2025-06-09', 450)
   RETURNING id
 )
-INSERT INTO public.transaction_entries (transaction_id, account_id, entry_side, amount, description)
+INSERT INTO public.transaction_entries (transaction_id, account_id, entry_type, amount, description)
 SELECT nt.id, acc.id,
   CASE acc.name
-    WHEN 'Pharmacy' THEN 'CREDIT'
-    WHEN 'Bank: HDFC' THEN 'DEBIT'
+    WHEN 'Pharmacy' THEN 'DEBIT'::entry_type_enum
+    WHEN 'Bank: HDFC' THEN 'CREDIT'::entry_type_enum
   END,
   450, 'Bought Medicines'
 FROM new_transaction nt
@@ -159,11 +159,11 @@ WITH new_transaction AS (
   VALUES ('6bbc2fe7-5de6-4d82-a402-3ee8251604dc', 'Movie + Snacks', '2025-06-10', 400)
   RETURNING id
 )
-INSERT INTO public.transaction_entries (transaction_id, account_id, entry_side, amount, description)
+INSERT INTO public.transaction_entries (transaction_id, account_id, entry_type, amount, description)
 SELECT nt.id, acc.id,
   CASE acc.name
-    WHEN 'Entertainment' THEN 'CREDIT'
-    WHEN 'Bank: HDFC' THEN 'DEBIT'
+    WHEN 'Entertainment' THEN 'DEBIT'::entry_type_enum
+    WHEN 'Bank: HDFC' THEN 'CREDIT'::entry_type_enum
   END,
   400, 'Movie + Snacks'
 FROM new_transaction nt
@@ -176,11 +176,11 @@ WITH new_transaction AS (
   VALUES ('6bbc2fe7-5de6-4d82-a402-3ee8251604dc', 'Personal Shopping', '2025-06-11', 800)
   RETURNING id
 )
-INSERT INTO public.transaction_entries (transaction_id, account_id, entry_side, amount, description)
+INSERT INTO public.transaction_entries (transaction_id, account_id, entry_type, amount, description)
 SELECT nt.id, acc.id,
   CASE acc.name
-    WHEN 'Personal' THEN 'CREDIT'
-    WHEN 'Bank: HDFC' THEN 'DEBIT'
+    WHEN 'Personal' THEN 'DEBIT'::entry_type_enum
+    WHEN 'Bank: HDFC' THEN 'CREDIT'::entry_type_enum
   END,
   800, 'Personal Shopping'
 FROM new_transaction nt
@@ -193,11 +193,11 @@ WITH new_transaction AS (
   VALUES ('6bbc2fe7-5de6-4d82-a402-3ee8251604dc', 'Kids School Fees', '2025-06-12', 3000)
   RETURNING id
 )
-INSERT INTO public.transaction_entries (transaction_id, account_id, entry_side, amount, description)
+INSERT INTO public.transaction_entries (transaction_id, account_id, entry_type, amount, description)
 SELECT nt.id, acc.id,
   CASE acc.name
-    WHEN 'Kid Education' THEN 'CREDIT'
-    WHEN 'Bank: HDFC' THEN 'DEBIT'
+    WHEN 'Kid Education' THEN 'DEBIT'::entry_type_enum
+    WHEN 'Bank: HDFC' THEN 'CREDIT'::entry_type_enum
   END,
   3000, 'Kids School Fees'
 FROM new_transaction nt
@@ -210,11 +210,11 @@ WITH new_transaction AS (
   VALUES ('6bbc2fe7-5de6-4d82-a402-3ee8251604dc', 'Bank Interest Received', '2025-06-13', 150)
   RETURNING id
 )
-INSERT INTO public.transaction_entries (transaction_id, account_id, entry_side, amount, description)
+INSERT INTO public.transaction_entries (transaction_id, account_id, entry_type, amount, description)
 SELECT nt.id, acc.id,
   CASE acc.name
-    WHEN 'Interest (Bank)' THEN 'DEBIT'
-    WHEN 'Bank: HDFC' THEN 'CREDIT'
+    WHEN 'Interest (Bank)' THEN 'CREDIT'::entry_type_enum
+    WHEN 'Bank: HDFC' THEN 'DEBIT'::entry_type_enum
   END,
   150, 'Bank Interest Received'
 FROM new_transaction nt
@@ -227,11 +227,11 @@ WITH new_transaction AS (
   VALUES ('6bbc2fe7-5de6-4d82-a402-3ee8251604dc', 'Dividend Received', '2025-06-14', 200)
   RETURNING id
 )
-INSERT INTO public.transaction_entries (transaction_id, account_id, entry_side, amount, description)
+INSERT INTO public.transaction_entries (transaction_id, account_id, entry_type, amount, description)
 SELECT nt.id, acc.id,
   CASE acc.name
-    WHEN 'Dividends' THEN 'DEBIT'
-    WHEN 'Bank: HDFC' THEN 'CREDIT'
+    WHEN 'Dividends' THEN 'CREDIT'::entry_type_enum
+    WHEN 'Bank: HDFC' THEN 'DEBIT'::entry_type_enum
   END,
   200, 'Dividend Received'
 FROM new_transaction nt
@@ -244,11 +244,11 @@ WITH new_transaction AS (
   VALUES ('6bbc2fe7-5de6-4d82-a402-3ee8251604dc', 'Cashback from UPI', '2025-06-15', 100)
   RETURNING id
 )
-INSERT INTO public.transaction_entries (transaction_id, account_id, entry_side, amount, description)
+INSERT INTO public.transaction_entries (transaction_id, account_id, entry_type, amount, description)
 SELECT nt.id, acc.id,
   CASE acc.name
-    WHEN 'Cashback' THEN 'DEBIT'
-    WHEN 'Bank: HDFC' THEN 'CREDIT'
+    WHEN 'Cashback' THEN 'CREDIT'::entry_type_enum
+    WHEN 'Bank: HDFC' THEN 'DEBIT'::entry_type_enum
   END,
   100, 'Cashback from UPI'
 FROM new_transaction nt
@@ -261,11 +261,11 @@ WITH new_transaction AS (
   VALUES ('6bbc2fe7-5de6-4d82-a402-3ee8251604dc', 'Home Loan Sanctioned', '2025-06-16', 500000)
   RETURNING id
 )
-INSERT INTO public.transaction_entries (transaction_id, account_id, entry_side, amount, description)
+INSERT INTO public.transaction_entries (transaction_id, account_id, entry_type, amount, description)
 SELECT nt.id, acc.id,
   CASE acc.name
-    WHEN 'Home Loan' THEN 'DEBIT'
-    WHEN 'Home Property' THEN 'CREDIT'
+    WHEN 'Home Loan' THEN 'CREDIT'::entry_type_enum
+    WHEN 'Home Property' THEN 'DEBIT'::entry_type_enum
   END,
   500000, 'Home Loan Sanctioned'
 FROM new_transaction nt
@@ -278,11 +278,11 @@ WITH new_transaction AS (
   VALUES ('6bbc2fe7-5de6-4d82-a402-3ee8251604dc', 'EMI Payment (Principal)', '2025-06-17', 18000)
   RETURNING id
 )
-INSERT INTO public.transaction_entries (transaction_id, account_id, entry_side, amount, description)
+INSERT INTO public.transaction_entries (transaction_id, account_id, entry_type, amount, description)
 SELECT nt.id, acc.id,
   CASE acc.name
-    WHEN 'Bank: HDFC' THEN 'DEBIT'
-    WHEN 'Home Loan' THEN 'CREDIT'
+    WHEN 'Bank: HDFC' THEN 'CREDIT'::entry_type_enum
+    WHEN 'Home Loan' THEN 'DEBIT'::entry_type_enum
   END,
   18000, 'EMI Payment (Principal)'
 FROM new_transaction nt
@@ -295,11 +295,11 @@ WITH new_transaction AS (
   VALUES ('6bbc2fe7-5de6-4d82-a402-3ee8251604dc', 'EMI Payment (Interest)', '2025-06-17', 2000)
   RETURNING id
 )
-INSERT INTO public.transaction_entries (transaction_id, account_id, entry_side, amount, description)
+INSERT INTO public.transaction_entries (transaction_id, account_id, entry_type, amount, description)
 SELECT nt.id, acc.id,
   CASE acc.name
-    WHEN 'Bank: HDFC' THEN 'DEBIT'
-    WHEN 'Loan Interest' THEN 'CREDIT'
+    WHEN 'Bank: HDFC' THEN 'CREDIT'::entry_type_enum
+    WHEN 'Loan Interest' THEN 'DEBIT'::entry_type_enum
   END,
   2000, 'EMI Payment (Interest)'
 FROM new_transaction nt
@@ -323,15 +323,15 @@ WITH new_transaction AS (
   VALUES ('6bbc2fe7-5de6-4d82-a402-3ee8251604dc', 'Buy 10 Quant ELSS @200', '2025-06-18', 2000)
   RETURNING id
 )
-INSERT INTO public.transaction_entries (transaction_id, account_id, quantity, price, amount, entry_side, description)
+INSERT INTO public.transaction_entries (transaction_id, account_id, quantity, price, amount, entry_type, description)
 SELECT nt.id, acc.id,
   CASE acc.name WHEN 'Quant ELSS' THEN 10 ELSE NULL END,
   CASE acc.name WHEN 'Quant ELSS' THEN 200 ELSE NULL END,
   2000,
   CASE acc.name
     WHEN 'Quant ELSS' THEN 'BUY'
-    WHEN 'Bank: HDFC' THEN 'CREDIT'
-  END,
+    WHEN 'Bank: HDFC' THEN 'DEBIT'
+  END::entry_type_enum,
   'Buy 10 units @200'
 FROM new_transaction nt
 CROSS JOIN public.accounts acc
@@ -353,15 +353,15 @@ WITH new_transaction AS (
   VALUES ('6bbc2fe7-5de6-4d82-a402-3ee8251604dc', 'Buy 5 Quant ELSS @210', '2025-06-19', 1050)
   RETURNING id
 )
-INSERT INTO public.transaction_entries (transaction_id, account_id, quantity, price, amount, entry_side, description)
+INSERT INTO public.transaction_entries (transaction_id, account_id, quantity, price, amount, entry_type, description)
 SELECT nt.id, acc.id,
   CASE acc.name WHEN 'Quant ELSS' THEN 5 ELSE NULL END,
   CASE acc.name WHEN 'Quant ELSS' THEN 210 ELSE NULL END,
   1050,
   CASE acc.name
     WHEN 'Quant ELSS' THEN 'BUY'
-    WHEN 'Bank: HDFC' THEN 'CREDIT'
-  END,
+    WHEN 'Bank: HDFC' THEN 'DEBIT'
+  END::entry_type_enum,
   'Buy 5 units @210'
 FROM new_transaction nt
 CROSS JOIN public.accounts acc
@@ -383,15 +383,15 @@ WITH new_transaction AS (
   VALUES ('6bbc2fe7-5de6-4d82-a402-3ee8251604dc', 'Sell 10 Quant ELSS @220', '2025-06-20', 2200)
   RETURNING id
 )
-INSERT INTO public.transaction_entries (transaction_id, account_id, quantity, price, amount, entry_side, description)
+INSERT INTO public.transaction_entries (transaction_id, account_id, quantity, price, amount, entry_type, description)
 SELECT nt.id, acc.id,
   CASE acc.name WHEN 'Quant ELSS' THEN 10 ELSE NULL END,
   CASE acc.name WHEN 'Quant ELSS' THEN 220 ELSE NULL END,
   2200,
   CASE acc.name
     WHEN 'Quant ELSS' THEN 'SELL'
-    WHEN 'Bank: HDFC' THEN 'DEBIT'
-  END,
+    WHEN 'Bank: HDFC' THEN 'CREDIT'
+  END::entry_type_enum,
   'Sell 10 units @220'
 FROM new_transaction nt
 CROSS JOIN public.accounts acc

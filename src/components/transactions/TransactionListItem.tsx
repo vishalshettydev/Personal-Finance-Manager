@@ -81,19 +81,49 @@ export const TransactionListItem = ({
     }
 
     if (isTransfer) {
-      // For regular transfers: From Account → To Account
-      const fromAccount = debitEntries[0]?.accounts?.name || "Unknown Account";
-      const toAccount = creditEntries[0]?.accounts?.name || "Unknown Account";
-      return `${fromAccount} → ${toAccount}`;
+      // For transfers: Show user-friendly flow direction (money source → destination)
+      // Investment case: Bank Account → Investment Account (CREDIT bank, DEBIT investment)
+      // Regular transfer: From Account → To Account
+
+      const debitAccount = debitEntries[0]?.accounts;
+      const creditAccount = creditEntries[0]?.accounts;
+
+      // Check if this is an investment transaction (asset account receiving money)
+      const isInvestmentTransaction =
+        debitAccount?.account_types?.category === "ASSET" &&
+        creditAccount?.account_types?.category === "ASSET" &&
+        (debitAccount?.account_types?.name
+          ?.toLowerCase()
+          .includes("mutual fund") ||
+          debitAccount?.account_types?.name?.toLowerCase().includes("stock") ||
+          debitAccount?.name?.toLowerCase().includes("quant") ||
+          debitAccount?.name?.toLowerCase().includes("fund"));
+
+      if (isInvestmentTransaction) {
+        // For investments: Show money flowing FROM bank TO investment
+        const sourceAccount = creditAccount?.name || "Source Account";
+        const destinationAccount = debitAccount?.name || "Investment Account";
+        return `${sourceAccount} → ${destinationAccount}`;
+      } else {
+        // For regular transfers: Show accounting flow (DEBIT account is destination)
+        const fromAccount = creditAccount?.name || "From Account";
+        const toAccount = debitAccount?.name || "To Account";
+        return `${fromAccount} → ${toAccount}`;
+      }
     } else if (isIncome) {
-      // For income: Income Source → Destination Account
-      const incomeSource = debitEntries[0]?.accounts?.name || "Income Source";
-      const destinationAccount = creditEntries[0]?.accounts?.name || "Account";
+      // For income: Show user-friendly flow (Income Source → Bank Account)
+      // Accounting: DEBIT bank account, CREDIT income account
+      // User perspective: Money flows FROM income source TO bank account
+      const incomeSource = creditEntries[0]?.accounts?.name || "Income Source";
+      const destinationAccount =
+        debitEntries[0]?.accounts?.name || "Bank Account";
       return `${incomeSource} → ${destinationAccount}`;
     } else {
-      // For expense: Source Account → Expense Account
-      const sourceAccount = debitEntries[0]?.accounts?.name || "Account";
-      const expenseAccount = creditEntries[0]?.accounts?.name || "Expense";
+      // For expense: Show user-friendly flow (Bank Account → Expense Account)
+      // Accounting: DEBIT expense account, CREDIT bank account
+      // User perspective: Money flows FROM bank account TO expense account
+      const sourceAccount = creditEntries[0]?.accounts?.name || "Bank Account";
+      const expenseAccount = debitEntries[0]?.accounts?.name || "Expense";
       return `${sourceAccount} → ${expenseAccount}`;
     }
   };
@@ -224,10 +254,10 @@ export const TransactionListItem = ({
               <div className="space-y-1">
                 {transaction.transaction_entries
                   ?.sort((a, b) => (a.line_number || 0) - (b.line_number || 0))
-                  .map((entry, index) => (
+                  .map((entry) => (
                     <div key={entry.id} className="flex justify-between">
                       <span className="truncate max-w-48">
-                        {index === 0 ? "From" : "To"}:{" "}
+                        {entry.entry_side === "CREDIT" ? "From" : "To"}:{" "}
                         {entry.accounts?.name || "Unknown"}
                       </span>
                       <span>{formatINR(entry.amount || 0)}</span>

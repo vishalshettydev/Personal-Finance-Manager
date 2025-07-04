@@ -214,11 +214,14 @@ export default function ChartOfAccounts({
   // Get current price for investment account
   const getCurrentPrice = useCallback(
     async (accountId: string): Promise<number> => {
+      if (!user?.id) return 0;
+
       try {
         const { data, error } = await supabase
           .from("account_prices")
           .select("price")
           .eq("account_id", accountId)
+          .eq("user_id", user.id)
           .order("date", { ascending: false })
           .limit(1)
           .single();
@@ -229,7 +232,7 @@ export default function ChartOfAccounts({
         return 0;
       }
     },
-    []
+    [user?.id]
   );
 
   // Fetch accounts from database

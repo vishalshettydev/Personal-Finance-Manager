@@ -74,7 +74,7 @@ export function AccountPriceModal({
 
   // Fetch existing prices for the account
   const fetchAccountPrices = async () => {
-    if (!account) return;
+    if (!account || !user?.id) return;
 
     setIsLoading(true);
     try {
@@ -82,6 +82,7 @@ export function AccountPriceModal({
         .from("account_prices")
         .select("*")
         .eq("account_id", account.id)
+        .eq("user_id", user.id)
         .order("date", { ascending: false });
 
       if (error) throw error;
@@ -117,7 +118,7 @@ export function AccountPriceModal({
           .update({
             price: price,
             notes: priceForm.notes || null,
-            updated_at: new Date().toISOString(),
+            user_id: user.id, // Ensure user_id is always set
           })
           .eq("id", existingPrice.id);
 
@@ -149,8 +150,22 @@ export function AccountPriceModal({
       await fetchAccountPrices();
       onPriceUpdated();
     } catch (error) {
-      console.error("Error updating price:", error);
-      toast.error("Error updating price. Please try again.");
+      console.error("Error updating price:", {
+        error: error,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
+        formData: {
+          price: priceForm.price,
+          date: priceForm.date,
+          notes: priceForm.notes,
+          accountId: account.id,
+          userId: user?.id,
+        },
+      });
+
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error occurred";
+      toast.error(`Error updating price: ${errorMessage}`);
     } finally {
       setIsSubmitting(false);
     }

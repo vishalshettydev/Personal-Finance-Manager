@@ -264,6 +264,7 @@ export default function AccountDetailPage() {
         .from("account_prices")
         .select("*")
         .eq("account_id", accountId)
+        .eq("user_id", user.id)
         .order("date", { ascending: false })
         .limit(1)
         .single();

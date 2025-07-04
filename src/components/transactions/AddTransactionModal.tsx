@@ -401,6 +401,7 @@ export function AddTransactionModal({
         .from("account_prices")
         .select("*")
         .eq("account_id", accountId)
+        .eq("user_id", userId)
         .eq("date", transactionForm.transaction_date)
         .single();
 
@@ -413,8 +414,12 @@ export function AddTransactionModal({
         // Update existing price
         const { error: updateError } = await supabase
           .from("account_prices")
-          .update({ price })
+          .update({
+            price,
+            user_id: userId, // Ensure user_id is set even on updates
+          })
           .eq("account_id", accountId)
+          .eq("user_id", userId)
           .eq("date", transactionForm.transaction_date);
 
         if (updateError) throw updateError;
@@ -423,6 +428,7 @@ export function AddTransactionModal({
         const { error: insertError } = await supabase
           .from("account_prices")
           .insert({
+            user_id: userId,
             account_id: accountId,
             price,
             date: transactionForm.transaction_date,
@@ -560,56 +566,367 @@ export function AddTransactionModal({
       // Create transaction entries for double-entry
       let entries;
 
+      // Get account information
+      const fromAccount = accounts.find(
+        (acc) => acc.id === transactionForm.debit_account_id
+      );
+      const toAccount = accounts.find(
+        (acc) => acc.id === transactionForm.credit_account_id
+      );
+      const fromType = fromAccount?.account_types?.category;
+      const toType = toAccount?.account_types?.category;
+      const fromName = fromAccount?.name?.toLowerCase() || "";
+
+      // Detect transaction types based on GnuCash accounting rules
+      const isOpeningBalance =
+        fromType === "EQUITY" &&
+        fromName.includes("opening balance") &&
+        (toType === "ASSET" || toType === "LIABILITY");
+
       if (transactionForm.is_split) {
-        // Split transaction: one debit, multiple credits
-        entries = [
-          // Single from account (DEBIT)
-          {
-            account_id: transactionForm.debit_account_id,
-            quantity: 1,
-            price: amount,
-            entry_side: "DEBIT" as const,
-            amount: amount,
-            line_number: 1,
-            description: transactionForm.description,
-          },
-          // Multiple to accounts (CREDITS)
-          ...transactionForm.split_to_entries.map((splitEntry, index) => ({
-            account_id: splitEntry.account_id,
-            quantity: 1,
-            price: splitEntry.amount,
-            entry_side: "CREDIT" as const,
-            amount: splitEntry.amount,
-            line_number: index + 2,
-            description: splitEntry.description || transactionForm.description,
-          })),
-        ];
+        // Split transaction: Determine the correct DEBIT/CREDIT based on account types
+        // For split transactions, we need to analyze what type of transaction this is
+        const fromAccountType = fromAccount?.account_types?.category;
+
+        if (fromAccountType === "ASSET" || fromAccountType === "LIABILITY") {
+          // Asset/Liability account as source - typically expense splits
+          // CREDIT the source account, DEBIT the split accounts
+          entries = [
+            {
+              account_id: transactionForm.debit_account_id, // Source account (Asset/Liability)
+              quantity: 1,
+              price: amount,
+              entry_side: "CREDIT" as const,
+              amount: amount,
+              line_number: 1,
+              description: transactionForm.description,
+            },
+            // Split accounts get DEBIT (typically expenses)
+            ...transactionForm.split_to_entries.map((splitEntry, index) => ({
+              account_id: splitEntry.account_id,
+              quantity: 1,
+              price: splitEntry.amount,
+              entry_side: "DEBIT" as const,
+              amount: splitEntry.amount,
+              line_number: index + 2,
+              description:
+                splitEntry.description || transactionForm.description,
+            })),
+          ];
+        } else if (fromAccountType === "INCOME") {
+          // Income account as source - income split to multiple assets
+          // CREDIT the income account, DEBIT the split accounts (assets)
+          entries = [
+            {
+              account_id: transactionForm.debit_account_id, // Source account (Income)
+              quantity: 1,
+              price: amount,
+              entry_side: "CREDIT" as const,
+              amount: amount,
+              line_number: 1,
+              description: transactionForm.description,
+            },
+            // Split accounts get DEBIT (typically assets)
+            ...transactionForm.split_to_entries.map((splitEntry, index) => ({
+              account_id: splitEntry.account_id,
+              quantity: 1,
+              price: splitEntry.amount,
+              entry_side: "DEBIT" as const,
+              amount: splitEntry.amount,
+              line_number: index + 2,
+              description:
+                splitEntry.description || transactionForm.description,
+            })),
+          ];
+        } else {
+          // Default split logic
+          entries = [
+            {
+              account_id: transactionForm.debit_account_id,
+              quantity: 1,
+              price: amount,
+              entry_side: "DEBIT" as const,
+              amount: amount,
+              line_number: 1,
+              description: transactionForm.description,
+            },
+            ...transactionForm.split_to_entries.map((splitEntry, index) => ({
+              account_id: splitEntry.account_id,
+              quantity: 1,
+              price: splitEntry.amount,
+              entry_side: "CREDIT" as const,
+              amount: splitEntry.amount,
+              line_number: index + 2,
+              description:
+                splitEntry.description || transactionForm.description,
+            })),
+          ];
+        }
+      } else if (isOpeningBalance) {
+        // Opening Balance: Handle based on account type
+        if (toType === "ASSET") {
+          // DEBIT asset, CREDIT equity (standard for asset opening balance)
+          entries = [
+            {
+              account_id: transactionForm.credit_account_id, // To Account (Asset)
+              quantity: 1,
+              price: amount,
+              entry_side: "DEBIT" as const,
+              amount: amount,
+              line_number: 1,
+              description: transactionForm.description,
+            },
+            {
+              account_id: transactionForm.debit_account_id, // From Account (Equity)
+              quantity: 1,
+              price: amount,
+              entry_side: "CREDIT" as const,
+              amount: amount,
+              line_number: 2,
+              description: transactionForm.description,
+            },
+          ];
+        } else if (toType === "LIABILITY") {
+          // CREDIT liability, DEBIT equity (for liability opening balance)
+          entries = [
+            {
+              account_id: transactionForm.credit_account_id, // To Account (Liability)
+              quantity: 1,
+              price: amount,
+              entry_side: "CREDIT" as const,
+              amount: amount,
+              line_number: 1,
+              description: transactionForm.description,
+            },
+            {
+              account_id: transactionForm.debit_account_id, // From Account (Equity)
+              quantity: 1,
+              price: amount,
+              entry_side: "DEBIT" as const,
+              amount: amount,
+              line_number: 2,
+              description: transactionForm.description,
+            },
+          ];
+        } else {
+          // Fallback for other account types
+          entries = [
+            {
+              account_id: transactionForm.credit_account_id,
+              quantity: 1,
+              price: amount,
+              entry_side: "DEBIT" as const,
+              amount: amount,
+              line_number: 1,
+              description: transactionForm.description,
+            },
+            {
+              account_id: transactionForm.debit_account_id,
+              quantity: 1,
+              price: amount,
+              entry_side: "CREDIT" as const,
+              amount: amount,
+              line_number: 2,
+              description: transactionForm.description,
+            },
+          ];
+        }
       } else {
-        // Regular transaction: one debit, one credit
-        entries = [
-          {
-            account_id: transactionForm.debit_account_id, // From Account
-            quantity: transactionForm.transaction_type === "investment" ? 1 : 1,
-            price: amount,
-            entry_side: "DEBIT" as const,
-            amount: amount,
-            line_number: 1,
-            description: transactionForm.description,
-          },
-          {
-            account_id: transactionForm.credit_account_id, // To Account
-            quantity:
-              transactionForm.transaction_type === "investment" ? quantity : 1,
-            price:
-              transactionForm.transaction_type === "investment"
-                ? price
-                : amount,
-            entry_side: "CREDIT" as const,
-            amount: amount,
-            line_number: 2,
-            description: transactionForm.description,
-          },
-        ];
+        // Regular transactions: Apply GnuCash accounting rules based on account types
+
+        // Determine the correct DEBIT/CREDIT based on the nature of the transaction
+        if (fromType === "INCOME") {
+          // Income Transaction: DEBIT asset/liability (to), CREDIT income (from)
+          // Example: Salary -> Bank: DEBIT Bank, CREDIT Salary
+          entries = [
+            {
+              account_id: transactionForm.credit_account_id, // To Account (Asset/Liability)
+              quantity: 1,
+              price: amount,
+              entry_side: "DEBIT" as const,
+              amount: amount,
+              line_number: 1,
+              description: transactionForm.description,
+            },
+            {
+              account_id: transactionForm.debit_account_id, // From Account (Income)
+              quantity: 1,
+              price: amount,
+              entry_side: "CREDIT" as const,
+              amount: amount,
+              line_number: 2,
+              description: transactionForm.description,
+            },
+          ];
+        } else if (toType === "EXPENSE") {
+          // Expense Transaction: DEBIT expense (to), CREDIT asset/liability (from)
+          // Example: Bank -> Food: DEBIT Food, CREDIT Bank
+          entries = [
+            {
+              account_id: transactionForm.credit_account_id, // To Account (Expense)
+              quantity: 1,
+              price: amount,
+              entry_side: "DEBIT" as const,
+              amount: amount,
+              line_number: 1,
+              description: transactionForm.description,
+            },
+            {
+              account_id: transactionForm.debit_account_id, // From Account (Asset/Liability)
+              quantity: 1,
+              price: amount,
+              entry_side: "CREDIT" as const,
+              amount: amount,
+              line_number: 2,
+              description: transactionForm.description,
+            },
+          ];
+        } else if (
+          transactionForm.transaction_type === "investment" &&
+          transactionForm.investment_type === "buy"
+        ) {
+          // Investment Buy: DEBIT investment (to), CREDIT asset (from)
+          // Example: Bank -> Mutual Fund: DEBIT Mutual Fund, CREDIT Bank
+          entries = [
+            {
+              account_id: transactionForm.credit_account_id, // To Account (Investment)
+              quantity: quantity,
+              price: price,
+              entry_side: "DEBIT" as const,
+              amount: amount,
+              line_number: 1,
+              description: transactionForm.description,
+            },
+            {
+              account_id: transactionForm.debit_account_id, // From Account (Asset)
+              quantity: 1,
+              price: amount,
+              entry_side: "CREDIT" as const,
+              amount: amount,
+              line_number: 2,
+              description: transactionForm.description,
+            },
+          ];
+        } else if (
+          transactionForm.transaction_type === "investment" &&
+          transactionForm.investment_type === "sell"
+        ) {
+          // Investment Sell: DEBIT asset (to), CREDIT investment (from)
+          // Example: Mutual Fund -> Bank: DEBIT Bank, CREDIT Mutual Fund
+          entries = [
+            {
+              account_id: transactionForm.credit_account_id, // To Account (Asset)
+              quantity: 1,
+              price: amount,
+              entry_side: "DEBIT" as const,
+              amount: amount,
+              line_number: 1,
+              description: transactionForm.description,
+            },
+            {
+              account_id: transactionForm.debit_account_id, // From Account (Investment)
+              quantity: quantity,
+              price: price,
+              entry_side: "CREDIT" as const,
+              amount: amount,
+              line_number: 2,
+              description: transactionForm.description,
+            },
+          ];
+        } else if (
+          (fromType === "ASSET" || fromType === "LIABILITY") &&
+          (toType === "ASSET" || toType === "LIABILITY")
+        ) {
+          // Transfer between Assets/Liabilities: DEBIT destination, CREDIT source
+          // Example: Bank -> Cash: DEBIT Cash, CREDIT Bank
+          entries = [
+            {
+              account_id: transactionForm.credit_account_id, // To Account (destination)
+              quantity: 1,
+              price: amount,
+              entry_side: "DEBIT" as const,
+              amount: amount,
+              line_number: 1,
+              description: transactionForm.description,
+            },
+            {
+              account_id: transactionForm.debit_account_id, // From Account (source)
+              quantity: 1,
+              price: amount,
+              entry_side: "CREDIT" as const,
+              amount: amount,
+              line_number: 2,
+              description: transactionForm.description,
+            },
+          ];
+        } else if (fromType === "LIABILITY" && toType === "EXPENSE") {
+          // Liability to Expense (e.g., Credit Card -> Food): DEBIT expense, CREDIT liability
+          entries = [
+            {
+              account_id: transactionForm.credit_account_id, // To Account (Expense)
+              quantity: 1,
+              price: amount,
+              entry_side: "DEBIT" as const,
+              amount: amount,
+              line_number: 1,
+              description: transactionForm.description,
+            },
+            {
+              account_id: transactionForm.debit_account_id, // From Account (Liability)
+              quantity: 1,
+              price: amount,
+              entry_side: "CREDIT" as const,
+              amount: amount,
+              line_number: 2,
+              description: transactionForm.description,
+            },
+          ];
+        } else if (fromType === "ASSET" && toType === "LIABILITY") {
+          // Asset to Liability (e.g., Bank -> Loan Payment): DEBIT liability, CREDIT asset
+          // This is for loan payments where money from bank reduces the loan
+          entries = [
+            {
+              account_id: transactionForm.credit_account_id, // To Account (Liability - being reduced)
+              quantity: 1,
+              price: amount,
+              entry_side: "DEBIT" as const,
+              amount: amount,
+              line_number: 1,
+              description: transactionForm.description,
+            },
+            {
+              account_id: transactionForm.debit_account_id, // From Account (Asset)
+              quantity: 1,
+              price: amount,
+              entry_side: "CREDIT" as const,
+              amount: amount,
+              line_number: 2,
+              description: transactionForm.description,
+            },
+          ];
+        } else {
+          // Fallback: Use the user's selection as-is (should rarely happen)
+          entries = [
+            {
+              account_id: transactionForm.debit_account_id,
+              quantity: 1,
+              price: amount,
+              entry_side: "DEBIT" as const,
+              amount: amount,
+              line_number: 1,
+              description: transactionForm.description,
+            },
+            {
+              account_id: transactionForm.credit_account_id,
+              quantity: 1,
+              price: amount,
+              entry_side: "CREDIT" as const,
+              amount: amount,
+              line_number: 2,
+              description: transactionForm.description,
+            },
+          ];
+        }
       }
 
       // Validate double-entry

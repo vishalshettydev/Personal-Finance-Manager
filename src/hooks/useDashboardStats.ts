@@ -135,155 +135,76 @@ export const useDashboardStats = (userId: string | null) => {
         });
       });
 
-      // Now calculate totals by category using the calculated balances
+      // Helper: is this account an investment?
+      const isInvestmentAccount = (account: {
+        account_types?: { name?: string } | null;
+      }) => {
+        const type = account.account_types?.name?.toLowerCase() || "";
+        return type === "mutual fund" || type === "stock";
+      };
+
+      // Fetch current account prices for market value calculation
+      const { data: accountPrices, error: pricesError } = await supabase
+        .from("account_prices")
+        .select("account_id, price, date")
+        .eq("user_id", userId)
+        .order("date", { ascending: false });
+
+      if (pricesError) {
+        console.error("Error fetching account prices:", pricesError);
+      }
+
+      // Create a map of latest prices for each account
+      const latestPrices = new Map<string, number>();
+      accountPrices?.forEach((price) => {
+        if (!latestPrices.has(price.account_id)) {
+          latestPrices.set(price.account_id, price.price);
+        }
+      });
+
+      let totalBalanceCalc = 0;
+      let totalInvestmentsMarketValue = 0;
       let assets = 0;
       let liabilities = 0;
       let income = 0;
       let expenses = 0;
-      let totalInvestments = 0;
       let stocks = 0;
       let mutualFunds = 0;
 
-      // Get current prices for investment accounts
-      const getCurrentPrice = async (accountId: string): Promise<number> => {
-        try {
-          const { data, error } = await supabase
-            .from("account_prices")
-            .select("price")
-            .eq("account_id", accountId)
-            .order("date", { ascending: false })
-            .limit(1)
-            .single();
-
-          if (error && error.code !== "PGRST116") throw error;
-          return data?.price || 0;
-        } catch {
-          return 0;
-        }
-      };
-
-      // Calculate totals by account category
       for (const account of accounts || []) {
         const balance = accountBalances.get(account.id) || 0;
         const units = accountUnits.get(account.id) || 0;
+        const currentPrice = latestPrices.get(account.id) || 1; // Default to 1 if no price set
         const category = account.account_types?.category;
-        const accountTypeName =
-          account.account_types?.name?.toLowerCase() || "";
-        const accountName = account.name?.toLowerCase() || "";
+        const type = account.account_types?.name?.toLowerCase() || "";
 
-        switch (category) {
-          case "ASSET":
-            // Check if this is an investment account
-            const isInvestmentAccount =
-              accountTypeName.includes("mutual fund") ||
-              accountTypeName.includes("stock") ||
-              accountTypeName.includes("trading") ||
-              accountName.includes("quant") ||
-              accountName.includes("fund") ||
-              accountName.includes("equity") ||
-              accountName.includes("elss") ||
-              accountName.includes("tax") ||
-              units !== 0; // Has units = investment account
+        if (category === "ASSET") {
+          if (isInvestmentAccount(account)) {
+            // Calculate market value = units × current price
+            const marketValue = units * currentPrice;
+            totalInvestmentsMarketValue += marketValue;
 
-            if (isInvestmentAccount) {
-              // For investment accounts, calculate market value
-              const currentPrice = await getCurrentPrice(account.id);
-              let marketValue = 0;
+            if (type === "stock") stocks += marketValue;
+            if (type === "mutual fund") mutualFunds += marketValue;
 
-              if (currentPrice > 0 && units > 0) {
-                marketValue = units * currentPrice;
-              } else {
-                // Fallback to balance if no price data
-                marketValue = balance;
-              }
-
-              totalInvestments += marketValue;
-              assets += marketValue;
-
-              // Categorize investment type
-              if (
-                accountTypeName.includes("stock") ||
-                accountName.includes("stock")
-              ) {
-                stocks += marketValue;
-              } else if (
-                accountTypeName.includes("mutual fund") ||
-                accountName.includes("fund") ||
-                accountName.includes("quant") ||
-                accountName.includes("elss")
-              ) {
-                mutualFunds += marketValue;
-              } else {
-                mutualFunds += marketValue; // Default to mutual funds
-              }
-            } else {
-              // Regular asset account
-              assets += balance;
-            }
-            break;
-
-          case "LIABILITY":
-            // Liability accounts have CREDIT normal balance
-            // Positive balance = money owed
-            liabilities += balance;
-            break;
-
-          case "EQUITY":
-            // Equity accounts tracked but not displayed in dashboard
-            break;
-
-          case "INCOME":
-            // Income accounts have CREDIT normal balance
-            // Positive balance = money earned
-            income += balance;
-            break;
-
-          case "EXPENSE":
-            // Expense accounts have DEBIT normal balance
-            // Positive balance = money spent
-            expenses += balance;
-            break;
+            // Use market value for net worth calculation to include unrealized profits
+            assets += marketValue;
+          } else {
+            totalBalanceCalc += balance;
+            // Use balance for non-investment assets
+            assets += balance;
+          }
+        } else if (category === "LIABILITY") {
+          liabilities += balance;
+        } else if (category === "INCOME") {
+          income += balance;
+        } else if (category === "EXPENSE") {
+          expenses += balance;
         }
       }
 
-      // Calculate liquid assets (excluding investments)
-      let liquidAssets = 0;
-      accounts?.forEach((account) => {
-        const balance = accountBalances.get(account.id) || 0;
-        const category = account.account_types?.category;
-        const accountTypeName =
-          account.account_types?.name?.toLowerCase() || "";
-        const accountName = account.name?.toLowerCase() || "";
-
-        if (category === "ASSET") {
-          // Exclude investment accounts from liquid assets
-          const isInvestmentAccount =
-            accountTypeName.includes("mutual fund") ||
-            accountTypeName.includes("stock") ||
-            accountTypeName.includes("trading") ||
-            accountName.includes("quant") ||
-            accountName.includes("fund") ||
-            accountName.includes("equity") ||
-            accountName.includes("elss") ||
-            accountName.includes("tax") ||
-            (accountUnits.get(account.id) || 0) !== 0;
-
-          if (!isInvestmentAccount) {
-            // Include bank accounts, cash, and similar liquid assets
-            if (
-              accountTypeName.includes("bank") ||
-              accountTypeName.includes("cash") ||
-              accountName.includes("bank") ||
-              accountName.includes("cash") ||
-              accountName.includes("checking") ||
-              accountName.includes("savings") ||
-              accountName.includes("hdfc")
-            ) {
-              liquidAssets += balance;
-            }
-          }
-        }
-      });
+      // Net worth = all assets - all liabilities
+      const netWorth = assets - liabilities;
 
       // Calculate investment metrics
       let totalInvested = 0;
@@ -291,23 +212,13 @@ export const useDashboardStats = (userId: string | null) => {
       // Calculate total invested amount from transaction history
       transactions?.forEach((transaction) => {
         transaction.transaction_entries?.forEach((entry) => {
-          const accountName = entry.accounts?.name?.toLowerCase() || "";
-          const amount = entry.amount || 0;
-          const entrySide = entry.entry_side;
-          const category = entry.accounts?.account_types?.category;
-
-          // Look for investment accounts
-          if (
-            category === "ASSET" &&
-            (accountName.includes("quant") ||
-              accountName.includes("fund") ||
-              accountName.includes("elss") ||
-              accountName.includes("tax") ||
-              (entry.quantity || 0) > 0)
-          ) {
+          if (entry.accounts && isInvestmentAccount(entry.accounts)) {
             // For investment accounts (DEBIT normal balance):
             // DEBIT = money invested (purchase)
             // CREDIT = money withdrawn (sale)
+            const amount = entry.amount || 0;
+            const entrySide = entry.entry_side;
+
             if (entrySide === "DEBIT") {
               totalInvested += amount;
             } else if (entrySide === "CREDIT") {
@@ -323,13 +234,16 @@ export const useDashboardStats = (userId: string | null) => {
       income = Math.max(0, income);
 
       // Calculate derived values
-      const netWorth = assets - liabilities;
-      const totalBalance = liquidAssets;
+      const totalBalance = totalBalanceCalc;
+      const totalInvestments = totalInvestmentsMarketValue;
 
       // Calculate unrealized profit and percentage
-      const unrealizedProfit = totalInvestments - totalInvested;
-      const unrealizedProfitPercentage =
-        totalInvested > 0 ? (unrealizedProfit / totalInvested) * 100 : 0;
+      let unrealizedProfit = 0;
+      let unrealizedProfitPercentage = 0;
+      if (totalInvested > 0 && totalInvestments > 0) {
+        unrealizedProfit = totalInvestments - totalInvested;
+        unrealizedProfitPercentage = (unrealizedProfit / totalInvested) * 100;
+      }
 
       // Debug: Log comprehensive info for troubleshooting
       console.log("Dashboard Stats Debug:", {
@@ -352,6 +266,11 @@ export const useDashboardStats = (userId: string | null) => {
               type: a.account_types?.name,
               balance: accountBalances.get(a.id) || 0,
               units: accountUnits.get(a.id) || 0,
+              currentPrice: latestPrices.get(a.id) || 1,
+              marketValue: isInvestmentAccount(a)
+                ? (accountUnits.get(a.id) || 0) * (latestPrices.get(a.id) || 1)
+                : accountBalances.get(a.id) || 0,
+              isInvestment: isInvestmentAccount(a),
             })),
           liabilitiesBreakdown: accounts
             ?.filter((a) => a.account_types?.category === "LIABILITY")
@@ -359,7 +278,7 @@ export const useDashboardStats = (userId: string | null) => {
               name: a.name,
               balance: accountBalances.get(a.id) || 0,
             })),
-          netWorthCalculation: `${assets} - ${liabilities} = ${
+          netWorthCalculation: `${assets} (including market value of investments) - ${liabilities} = ${
             assets - liabilities
           }`,
           investmentDetails: {
@@ -367,6 +286,8 @@ export const useDashboardStats = (userId: string | null) => {
             totalInvested,
             stocks,
             mutualFunds,
+            accountPricesCount: accountPrices?.length || 0,
+            latestPricesMap: Object.fromEntries(latestPrices),
           },
         },
         accountsByCategory: accounts?.reduce(
@@ -415,21 +336,22 @@ export const useDashboardStats = (userId: string | null) => {
         })),
       });
 
-      setStats({
+      setStats((prev) => ({
+        ...prev,
         totalBalance,
+        totalInvestments,
+        assets,
+        liabilities,
         income,
         expenses,
         netWorth,
-        assets,
-        liabilities,
-        totalInvestments,
+        stocks,
+        mutualFunds,
         totalInvested,
         unrealizedProfit,
         unrealizedProfitPercentage,
-        stocks,
-        mutualFunds,
-        bondsAndFDs: 0, // Not currently tracked separately
-      });
+        bondsAndFDs: prev.bondsAndFDs,
+      }));
     } catch (error) {
       console.error("Dashboard stats calculation error:", error);
       setError(

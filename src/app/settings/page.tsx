@@ -383,7 +383,6 @@ export default function Settings() {
 
       // Step 2: If initial balance > 0, create opening balance transaction
       if (initialBalance > 0 && newAccount) {
-        // Find the "Opening Balance" account (it should be under Equity account)
         let openingBalanceAccount = null;
 
         // First, find the Equity account (parent)
@@ -470,23 +469,46 @@ export default function Settings() {
 
         if (transactionError) throw transactionError;
 
-        // Create the double entries
+        // Create the double entries based on account type
+        // For opening balances:
+        // - ASSET accounts: DEBIT the account, CREDIT opening balance equity
+        // - LIABILITY accounts: CREDIT the account, DEBIT opening balance equity
+        // - Other accounts: Follow their normal balance convention
+
+        const selectedAccountType = accountTypes.find(
+          (type) => type.id === accountForm.account_type_id
+        );
+        const normalBalance = selectedAccountType?.normal_balance;
+
+        let newAccountEntrySide: "DEBIT" | "CREDIT";
+        let openingBalanceEntrySide: "DEBIT" | "CREDIT";
+
+        if (normalBalance === "DEBIT") {
+          // DEBIT normal balance accounts (Assets, Expenses): DEBIT the account, CREDIT opening balance
+          newAccountEntrySide = "DEBIT";
+          openingBalanceEntrySide = "CREDIT";
+        } else {
+          // CREDIT normal balance accounts (Liabilities, Equity, Income): CREDIT the account, DEBIT opening balance
+          newAccountEntrySide = "CREDIT";
+          openingBalanceEntrySide = "DEBIT";
+        }
+
         const transactionEntries = [
           {
             transaction_id: transaction.id,
-            account_id: openingBalanceAccount.id, // Debit Opening Balance
+            account_id: newAccount.id,
             quantity: 1,
             price: initialBalance,
-            entry_side: "DEBIT" as const,
+            entry_side: newAccountEntrySide,
             amount: initialBalance,
             description: `Initial balance for ${accountForm.name}`,
           },
           {
             transaction_id: transaction.id,
-            account_id: newAccount.id, // Credit the new account
+            account_id: openingBalanceAccount.id,
             quantity: 1,
             price: initialBalance,
-            entry_side: "CREDIT" as const,
+            entry_side: openingBalanceEntrySide,
             amount: initialBalance,
             description: `Initial balance for ${accountForm.name}`,
           },

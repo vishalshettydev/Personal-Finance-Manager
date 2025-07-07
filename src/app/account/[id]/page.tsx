@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
@@ -17,6 +17,7 @@ import {
   PiggyBank,
 } from "lucide-react";
 import { toast } from "sonner";
+import { FullScreenLoading } from "@/components/common/LoadingSpinner";
 
 interface Account {
   id: string;
@@ -64,7 +65,7 @@ interface Transaction {
   }>;
 }
 
-export default function AccountDetailPage() {
+function AccountDetailContent() {
   const params = useParams();
   const router = useRouter();
   const { user, loading, initialize } = useAuthStore();
@@ -627,5 +628,13 @@ export default function AccountDetailPage() {
         </Card>
       </div>
     </DashboardLayout>
+  );
+}
+
+export default function AccountDetailPage() {
+  return (
+    <Suspense fallback={<FullScreenLoading text="Loading account details..." />}>
+      <AccountDetailContent />
+    </Suspense>
   );
 }

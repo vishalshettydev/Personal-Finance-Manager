@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, Suspense } from "react";
 import { useAuthStore } from "@/stores/auth";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { TransactionListItem } from "@/components/transactions/TransactionListItem";
@@ -14,7 +14,7 @@ import {
 import { useTransactions } from "@/hooks/useTransactions";
 import { Receipt, AlertCircle } from "lucide-react";
 
-export default function TransactionsPage() {
+function TransactionsContent() {
   const { user, loading, initialize } = useAuthStore();
 
   // Use the original transactions hook
@@ -326,5 +326,13 @@ export default function TransactionsPage() {
         </div>
       </DashboardLayout>
     </ErrorBoundary>
+  );
+}
+
+export default function TransactionsPage() {
+  return (
+    <Suspense fallback={<FullScreenLoading text="Loading transactions..." />}>
+      <TransactionsContent />
+    </Suspense>
   );
 }

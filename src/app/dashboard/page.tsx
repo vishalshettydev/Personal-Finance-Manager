@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useAuthStore } from "@/stores/auth";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import ChartOfAccounts from "@/components/ChartOfAccounts";
@@ -52,7 +52,7 @@ interface Account {
   };
 }
 
-export default function Dashboard() {
+function DashboardContent() {
   const { user, loading, initialize } = useAuthStore();
 
   // Data states for the modal
@@ -276,5 +276,13 @@ export default function Dashboard() {
         </div>
       </DashboardLayout>
     </ErrorBoundary>
+  );
+}
+
+export default function Dashboard() {
+  return (
+    <Suspense fallback={<FullScreenLoading text="Loading dashboard..." />}>
+      <DashboardContent />
+    </Suspense>
   );
 }

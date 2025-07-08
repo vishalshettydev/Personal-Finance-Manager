@@ -1,6 +1,6 @@
 "use client";
 
-import { TrendingUp, TrendingDown, ChevronRight, Split } from "lucide-react";
+import { TrendingUp, TrendingDown, ChevronRight } from "lucide-react";
 import { formatINR, formatRelativeDate } from "@/utils/formatters";
 import { TransactionData, TransactionType } from "@/types/transaction";
 import { TransactionTags } from "./TransactionTags";
@@ -64,18 +64,32 @@ export const TransactionListItem = ({
     }
 
     if (isSplitTransaction && !contextAccountId) {
-      // Full split transaction view - show primary account and split indicator
-      const primaryEntry = transaction.transaction_entries?.find(
-        (entry) => entry.line_number === 1
-      );
-      const splitCount = transaction.transaction_entries?.length - 1 || 0;
+      // Full split transaction view - show debit and credit accounts
+      const debitAccounts = debitEntries
+        .map((entry) => entry.accounts?.name)
+        .filter(Boolean);
+      const creditAccounts = creditEntries
+        .map((entry) => entry.accounts?.name)
+        .filter(Boolean);
 
-      if (primaryEntry) {
-        return `${
-          primaryEntry.accounts?.name || "Unknown Account"
-        } → Split (${splitCount} entries)`;
+      if (debitAccounts.length > 0 && creditAccounts.length > 0) {
+        // Show first credit account → first debit account if simple split
+        if (creditAccounts.length === 1 && debitAccounts.length === 1) {
+          return `${creditAccounts[0]} → ${debitAccounts[0]}`;
+        }
+        // Show multiple accounts format
+        const fromAccounts =
+          creditAccounts.length > 1
+            ? `${creditAccounts[0]} (+${creditAccounts.length - 1})`
+            : creditAccounts[0];
+        const toAccounts =
+          debitAccounts.length > 1
+            ? `${debitAccounts[0]} (+${debitAccounts.length - 1})`
+            : debitAccounts[0];
+        return `${fromAccounts} → ${toAccounts}`;
       }
-      return `Split Transaction (${
+
+      return `Multiple Accounts (${
         transaction.transaction_entries?.length || 0
       } entries)`;
     }
@@ -130,24 +144,16 @@ export const TransactionListItem = ({
 
   // Get transaction type label
   const getTransactionTypeLabel = (type: TransactionType): string => {
-    const baseLabel = (() => {
-      switch (type) {
-        case "income":
-          return "Income";
-        case "expense":
-          return "Expense";
-        case "transfer":
-          return "Transfer";
-        default:
-          return "Transaction";
-      }
-    })();
-
-    if (isSplitTransaction) {
-      return `${baseLabel} (Split)`;
+    switch (type) {
+      case "income":
+        return "Income";
+      case "expense":
+        return "Expense";
+      case "transfer":
+        return "Transfer";
+      default:
+        return "Transaction";
     }
-
-    return baseLabel;
   };
 
   // Determine amount display color and prefix
@@ -201,18 +207,10 @@ export const TransactionListItem = ({
       <div className="flex items-center">
         <div
           className={`p-2 rounded-full mr-4 ${
-            isSplitTransaction
-              ? "bg-purple-100"
-              : isIncome
-              ? "bg-green-100"
-              : isExpense
-              ? "bg-red-100"
-              : "bg-blue-100"
+            isIncome ? "bg-green-100" : isExpense ? "bg-red-100" : "bg-blue-100"
           }`}
         >
-          {isSplitTransaction ? (
-            <Split className="h-4 w-4 text-purple-600" />
-          ) : isIncome ? (
+          {isIncome ? (
             <TrendingUp className="h-4 w-4 text-green-600" />
           ) : isExpense ? (
             <TrendingDown className="h-4 w-4 text-red-600" />

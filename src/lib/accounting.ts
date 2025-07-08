@@ -278,4 +278,267 @@ export class AccountingEngine {
       netIncome: totalIncome - totalExpenses,
     };
   }
+
+  // FIFO Investment Lot Tracking
+  static async calculateInvestmentFIFO(
+    accountId: string,
+    userId: string,
+    saleQuantity: number,
+    saleDate: string
+  ): Promise<{
+    fifoLots: Array<{
+      purchaseDate: string;
+      quantity: number;
+      price: number;
+      amount: number;
+    }>;
+    totalCostBasis: number;
+    averageCostBasis: number;
+  }> {
+    // Get all purchase and sale entries for this investment account, ordered by date
+    const { data: entries, error } = await supabase
+      .from("transaction_entries")
+      .select(
+        `
+        *,
+        transactions!inner(transaction_date, user_id)
+      `
+      )
+      .eq("account_id", accountId)
+      .eq("transactions.user_id", userId)
+      .lte("transactions.transaction_date", saleDate)
+      .order("transactions.transaction_date", { ascending: true });
+
+    if (error) {
+      console.error("Error fetching investment entries for FIFO:", error);
+      throw error;
+    }
+
+    // Build purchase lots using FIFO
+    const purchaseLots: Array<{
+      purchaseDate: string;
+      quantity: number;
+      price: number;
+      amount: number;
+      remainingQuantity: number;
+    }> = [];
+
+    // Process all entries chronologically
+    entries?.forEach((entry) => {
+      const date = entry.transactions.transaction_date;
+      const quantity = entry.quantity || 0;
+      const price = entry.price || 0;
+      const amount = entry.amount || 0;
+      const entrySide = entry.entry_side;
+
+      if (entrySide === "DEBIT") {
+        // Purchase - add new lot
+        purchaseLots.push({
+          purchaseDate: date,
+          quantity,
+          price,
+          amount,
+          remainingQuantity: quantity,
+        });
+      } else if (entrySide === "CREDIT" && quantity > 0) {
+        // Sale - reduce lots using FIFO
+        let saleQuantityRemaining = quantity;
+
+        for (const lot of purchaseLots) {
+          if (saleQuantityRemaining <= 0) break;
+
+          const quantityToReduce = Math.min(
+            saleQuantityRemaining,
+            lot.remainingQuantity
+          );
+          lot.remainingQuantity -= quantityToReduce;
+          saleQuantityRemaining -= quantityToReduce;
+        }
+      }
+    });
+
+    // Now calculate FIFO for the current sale
+    const fifoLots: Array<{
+      purchaseDate: string;
+      quantity: number;
+      price: number;
+      amount: number;
+    }> = [];
+
+    let remainingSaleQuantity = saleQuantity;
+    let totalCostBasis = 0;
+
+    for (const lot of purchaseLots) {
+      if (remainingSaleQuantity <= 0) break;
+      if (lot.remainingQuantity <= 0) continue;
+
+      const quantityFromThisLot = Math.min(
+        remainingSaleQuantity,
+        lot.remainingQuantity
+      );
+      const amountFromThisLot = quantityFromThisLot * lot.price;
+
+      fifoLots.push({
+        purchaseDate: lot.purchaseDate,
+        quantity: quantityFromThisLot,
+        price: lot.price,
+        amount: amountFromThisLot,
+      });
+
+      totalCostBasis += amountFromThisLot;
+      remainingSaleQuantity -= quantityFromThisLot;
+    }
+
+    const averageCostBasis =
+      saleQuantity > 0 ? totalCostBasis / saleQuantity : 0;
+
+    return {
+      fifoLots,
+      totalCostBasis,
+      averageCostBasis,
+    };
+  }
+
+  // Check if account is investment type
+  static isInvestmentAccount(account: {
+    account_types?: { name?: string };
+  }): boolean {
+    const accountType = account.account_types?.name?.toLowerCase() || "";
+    return accountType === "mutual fund" || accountType === "stock";
+  }
+
+  // Process investment sale with FIFO and create gain/loss entries
+  static async processInvestmentSaleWithFIFO(
+    saleEntry: TransactionEntryInput & { transaction_id: string },
+    transactionDate: string,
+    userId: string
+  ): Promise<void> {
+    // Only process CREDIT entries to investment accounts (sales)
+    if (saleEntry.entry_side !== "CREDIT") return;
+
+    // Get account information
+    const { data: account } = await supabase
+      .from("accounts")
+      .select(
+        `
+        *,
+        account_types(*)
+      `
+      )
+      .eq("id", saleEntry.account_id)
+      .single();
+
+    if (
+      !account ||
+      !account.account_types ||
+      !this.isInvestmentAccount({ account_types: account.account_types })
+    )
+      return;
+
+    const saleQuantity = saleEntry.quantity || 0;
+    if (saleQuantity <= 0) return;
+
+    try {
+      // Calculate FIFO cost basis
+      const fifoResult = await this.calculateInvestmentFIFO(
+        saleEntry.account_id,
+        userId,
+        saleQuantity,
+        transactionDate
+      );
+
+      // Calculate gain/loss
+      const saleAmount = saleEntry.amount;
+      const costBasis = fifoResult.totalCostBasis;
+      const gainLoss = saleAmount - costBasis;
+
+      if (Math.abs(gainLoss) > 0.01) {
+        // Create gain/loss entry if significant
+        // Find appropriate gain/loss account or create one
+        let gainLossAccount;
+
+        const accountName =
+          gainLoss > 0 ? "Investment Gains" : "Investment Losses";
+        const { data: existingAccount } = await supabase
+          .from("accounts")
+          .select("*")
+          .eq("user_id", userId)
+          .eq("name", accountName)
+          .single();
+
+        if (existingAccount) {
+          gainLossAccount = existingAccount;
+        } else {
+          // Get the appropriate account type for gain/loss
+          const { data: accountType } = await supabase
+            .from("account_types")
+            .select("*")
+            .eq("name", gainLoss > 0 ? "Income" : "Expense")
+            .single();
+
+          if (accountType) {
+            const { data: newAccount } = await supabase
+              .from("accounts")
+              .insert({
+                user_id: userId,
+                name: accountName,
+                account_type_id: accountType.id,
+                is_placeholder: false,
+                is_active: true,
+                balance: 0,
+              })
+              .select()
+              .single();
+
+            gainLossAccount = newAccount;
+          }
+        }
+
+        if (gainLossAccount) {
+          // Insert gain/loss transaction entry
+          const gainLossEntrySide = gainLoss > 0 ? "CREDIT" : "DEBIT";
+
+          await supabase.from("transaction_entries").insert({
+            transaction_id: saleEntry.transaction_id,
+            account_id: gainLossAccount.id,
+            entry_side: gainLossEntrySide,
+            amount: Math.abs(gainLoss),
+            quantity: 1,
+            price: Math.abs(gainLoss),
+            description: `${gainLoss > 0 ? "Gain" : "Loss"} on sale of ${
+              account.name
+            } (FIFO)`,
+            line_number: 999, // High number to appear last
+          });
+
+          // Update the gain/loss account balance
+          await this.updateAccountBalances([
+            {
+              transaction_id: saleEntry.transaction_id,
+              account_id: gainLossAccount.id,
+              entry_side: gainLossEntrySide,
+              amount: Math.abs(gainLoss),
+              quantity: 1,
+              price: Math.abs(gainLoss),
+              description: `${gainLoss > 0 ? "Gain" : "Loss"} on sale of ${
+                account.name
+              } (FIFO)`,
+              line_number: 999,
+            },
+          ]);
+        }
+      }
+
+      console.log(`FIFO calculation for ${account.name}:`, {
+        saleQuantity,
+        saleAmount,
+        costBasis,
+        gainLoss,
+        fifoLots: fifoResult.fifoLots,
+      });
+    } catch (error) {
+      console.error("Error processing FIFO for investment sale:", error);
+      // Don't throw error to avoid breaking the transaction
+    }
+  }
 }

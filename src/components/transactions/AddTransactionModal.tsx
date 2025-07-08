@@ -12,16 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Plus,
-  Receipt,
-  Search,
-  X,
-  TrendingUp,
-  ArrowRightLeft,
-  Split,
-  Trash2,
-} from "lucide-react";
+import { Plus, Receipt, Search, X } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
 import { Tag } from "@/lib/types";
@@ -42,28 +33,23 @@ interface Account {
   };
 }
 
-interface SplitToEntry {
+interface AccountSplitEntry {
   id?: string;
   account_id: string;
-  amount: number;
-  description: string;
+  debit_amount: number;
+  credit_amount: number;
+  quantity: number;
+  price: number;
+  memo: string;
 }
 
 interface TransactionFormData {
   description: string;
   reference_number: string;
   transaction_date: string;
-  transaction_type: "investment" | "regular";
-  investment_type: "buy" | "sell";
-  quantity: string;
-  price: string;
-  amount: string;
   notes: string;
-  debit_account_id: string;
-  credit_account_id: string;
   selected_tags: Tag[];
-  is_split: boolean;
-  split_to_entries: SplitToEntry[];
+  account_splits: AccountSplitEntry[];
 }
 
 interface AddTransactionModalProps {
@@ -91,35 +77,34 @@ export function AddTransactionModal({
     description: "",
     reference_number: "",
     transaction_date: new Date().toISOString().split("T")[0],
-    transaction_type: "regular",
-    investment_type: "buy",
-    quantity: "1",
-    price: "",
-    amount: "",
     notes: "",
-    debit_account_id: "",
-    credit_account_id: "",
     selected_tags: [],
-    is_split: false,
-    split_to_entries: [
+    account_splits: [
       {
         account_id: "",
-        amount: 0,
-        description: "",
+        debit_amount: 0,
+        credit_amount: 0,
+        quantity: 1,
+        price: 0,
+        memo: "",
+      },
+      {
+        account_id: "",
+        debit_amount: 0,
+        credit_amount: 0,
+        quantity: 1,
+        price: 0,
+        memo: "",
       },
     ],
   });
 
   // UI states for dropdowns and search
   const [tagSearchTerm, setTagSearchTerm] = useState("");
-  const [fromAccountSearch, setFromAccountSearch] = useState("");
-  const [toAccountSearch, setToAccountSearch] = useState("");
-  const [showFromDropdown, setShowFromDropdown] = useState(false);
-  const [showToDropdown, setShowToDropdown] = useState(false);
-  const [splitAccountSearchTerms, setSplitAccountSearchTerms] = useState<{
+  const [accountSearchTerms, setAccountSearchTerms] = useState<{
     [key: number]: string;
   }>({});
-  const [showSplitDropdowns, setShowSplitDropdowns] = useState<{
+  const [showAccountDropdowns, setShowAccountDropdowns] = useState<{
     [key: number]: boolean;
   }>({});
 
@@ -187,119 +172,73 @@ export function AddTransactionModal({
     );
   };
 
-  // Search accounts by name and path with investment filtering
+  // Search accounts by name and path
   const searchAccounts = (
     searchTerm: string,
-    excludeIds: string[] = [],
-    isFromAccount: boolean = false
+    excludeIds: string[] = []
   ): Account[] => {
-    if (!searchTerm) return [];
-
     let filteredAccounts = accounts.filter(
-      (acc) =>
-        !acc.is_placeholder &&
-        !excludeIds.includes(acc.id) &&
-        (acc.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          getAccountPath(acc.id)
-            .toLowerCase()
-            .includes(searchTerm.toLowerCase()))
+      (acc) => !acc.is_placeholder && !excludeIds.includes(acc.id)
     );
 
-    // Apply transaction type filtering
-    if (transactionForm.transaction_type === "investment") {
-      if (isFromAccount) {
-        if (transactionForm.investment_type === "buy") {
-          // For buy: exclude investment accounts from "from" account
-          filteredAccounts = filteredAccounts.filter(
-            (acc) => !isInvestmentAccount(acc)
-          );
-        } else {
-          // For sell: only show investment accounts in "from" account
-          filteredAccounts = filteredAccounts.filter((acc) =>
-            isInvestmentAccount(acc)
-          );
-        }
-      } else {
-        // To account
-        if (transactionForm.investment_type === "buy") {
-          // For buy: only show investment accounts in "to" account
-          filteredAccounts = filteredAccounts.filter((acc) =>
-            isInvestmentAccount(acc)
-          );
-        } else {
-          // For sell: exclude investment accounts from "to" account
-          filteredAccounts = filteredAccounts.filter(
-            (acc) => !isInvestmentAccount(acc)
-          );
-        }
-      }
+    // If there's a search term, filter by name/path
+    if (searchTerm) {
+      filteredAccounts = filteredAccounts.filter(
+        (acc) =>
+          acc.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          getAccountPath(acc.id)
+            .toLowerCase()
+            .includes(searchTerm.toLowerCase())
+      );
     }
 
     return filteredAccounts.slice(0, 20); // Limit results
   };
 
-  // Split transaction management
-  const toggleSplitTransaction = () => {
-    setTransactionForm((prev) => ({
-      ...prev,
-      is_split: !prev.is_split,
-      credit_account_id: prev.is_split ? prev.credit_account_id : "", // Clear regular to account when enabling split
-      split_to_entries: prev.is_split
-        ? [{ account_id: "", amount: 0, description: "" }]
-        : prev.split_to_entries,
-    }));
-
-    // Clear/Initialize split-related UI states
-    if (transactionForm.is_split) {
-      // Disabling split - clear everything
-      setSplitAccountSearchTerms({});
-      setShowSplitDropdowns({});
-    } else {
-      // Enabling split - initialize first entry
-      setSplitAccountSearchTerms({ 0: "" });
-      setShowSplitDropdowns({ 0: false });
-    }
-
-    setToAccountSearch("");
-    setShowToDropdown(false);
-  };
-
-  const addSplitToEntry = () => {
-    const newIndex = transactionForm.split_to_entries.length;
+  // Account split management
+  const addAccountSplit = () => {
+    const newIndex = transactionForm.account_splits.length;
 
     setTransactionForm((prev) => ({
       ...prev,
-      split_to_entries: [
-        ...prev.split_to_entries,
-        { account_id: "", amount: 0, description: "" },
+      account_splits: [
+        ...prev.account_splits,
+        {
+          account_id: "",
+          debit_amount: 0,
+          credit_amount: 0,
+          quantity: 1,
+          price: 0,
+          memo: "",
+        },
       ],
     }));
 
     // Initialize search term for new entry
-    setSplitAccountSearchTerms((prev) => ({
+    setAccountSearchTerms((prev) => ({
       ...prev,
       [newIndex]: "",
     }));
 
-    setShowSplitDropdowns((prev) => ({
+    setShowAccountDropdowns((prev) => ({
       ...prev,
       [newIndex]: false,
     }));
   };
 
-  const removeSplitToEntry = (index: number) => {
-    if (transactionForm.split_to_entries.length <= 1) {
-      toast.error("Must have at least one split entry");
+  const removeAccountSplit = (index: number) => {
+    if (transactionForm.account_splits.length <= 2) {
+      toast.error("Must have at least two account splits");
       return;
     }
 
     setTransactionForm((prev) => ({
       ...prev,
-      split_to_entries: prev.split_to_entries.filter((_, i) => i !== index),
+      account_splits: prev.account_splits.filter((_, i) => i !== index),
     }));
 
     // Clean up UI states - rebuild search terms for remaining entries
-    const remainingEntries = transactionForm.split_to_entries.filter(
+    const remainingEntries = transactionForm.account_splits.filter(
       (_, i) => i !== index
     );
     const newSearchTerms: { [key: number]: string } = {};
@@ -315,98 +254,132 @@ export function AddTransactionModal({
       newDropdownStates[newIndex] = false;
     });
 
-    setSplitAccountSearchTerms(newSearchTerms);
-    setShowSplitDropdowns(newDropdownStates);
+    setAccountSearchTerms(newSearchTerms);
+    setShowAccountDropdowns(newDropdownStates);
   };
 
-  const updateSplitToEntry = (
+  const updateAccountSplit = (
     index: number,
-    field: keyof SplitToEntry,
+    field: keyof AccountSplitEntry,
     value: string | number
   ) => {
     setTransactionForm((prev) => ({
       ...prev,
-      split_to_entries: prev.split_to_entries.map((entry, i) =>
-        i === index ? { ...entry, [field]: value } : entry
-      ),
+      account_splits: prev.account_splits.map((entry, i) => {
+        if (i === index) {
+          return { ...entry, [field]: value };
+        }
+        return entry;
+      }),
     }));
   };
 
-  const handleSplitAccountSelect = (accountId: string, index: number) => {
+  const handleAccountSelect = (accountId: string, index: number) => {
     const selectedAccount = accounts.find((acc) => acc.id === accountId);
-    updateSplitToEntry(index, "account_id", accountId);
-    setSplitAccountSearchTerms((prev) => ({
+    updateAccountSplit(index, "account_id", accountId);
+    setAccountSearchTerms((prev) => ({
       ...prev,
       [index]: selectedAccount?.name || "",
     }));
-    setShowSplitDropdowns((prev) => ({ ...prev, [index]: false }));
+    setShowAccountDropdowns((prev) => ({ ...prev, [index]: false }));
   };
 
-  // Calculate split amounts and validation
-  const calculateSplitTotal = (): number => {
-    return transactionForm.split_to_entries.reduce(
-      (sum, entry) => sum + entry.amount,
+  // Calculate totals
+  const calculateTotalDebits = (): number => {
+    return transactionForm.account_splits.reduce(
+      (sum, entry) => sum + (entry.debit_amount || 0),
       0
     );
   };
 
-  const calculateRemainingAmount = (): number => {
-    const totalAmount = parseFloat(transactionForm.amount) || 0;
-    const splitTotal = calculateSplitTotal();
-    return Math.max(0, totalAmount - splitTotal);
+  const calculateTotalCredits = (): number => {
+    return transactionForm.account_splits.reduce(
+      (sum, entry) => sum + (entry.credit_amount || 0),
+      0
+    );
   };
 
-  // Validation for split transactions
-  const validateSplitTransaction = (): boolean => {
-    if (!transactionForm.is_split) return true;
+  const calculateDifference = (): number => {
+    return calculateTotalDebits() - calculateTotalCredits();
+  };
 
-    const totalAmount = parseFloat(transactionForm.amount) || 0;
-    const splitTotal = calculateSplitTotal();
+  // Validation for account splits
+  const validateAccountSplits = (): boolean => {
+    const totalDebits = calculateTotalDebits();
+    const totalCredits = calculateTotalCredits();
 
     // Check if amounts balance
-    if (Math.abs(totalAmount - splitTotal) > 0.01) {
-      toast.error("Split amounts must equal the total amount");
+    if (Math.abs(totalDebits - totalCredits) > 0.01) {
+      toast.error("Total debits must equal total credits");
       return false;
     }
 
-    // Check if all split entries have accounts
-    if (transactionForm.split_to_entries.some((entry) => !entry.account_id)) {
-      toast.error("All split entries must have an account selected");
+    // Check if all splits have accounts
+    if (transactionForm.account_splits.some((entry) => !entry.account_id)) {
+      toast.error("All account splits must have an account selected");
       return false;
     }
 
-    // Check if all amounts are positive
-    if (transactionForm.split_to_entries.some((entry) => entry.amount <= 0)) {
-      toast.error("All split amounts must be greater than zero");
+    // Check if at least one debit and one credit exists
+    const hasDebit = transactionForm.account_splits.some(
+      (entry) => entry.debit_amount > 0
+    );
+    const hasCredit = transactionForm.account_splits.some(
+      (entry) => entry.credit_amount > 0
+    );
+
+    if (!hasDebit || !hasCredit) {
+      toast.error("Must have at least one debit and one credit entry");
       return false;
     }
 
     // Check for duplicate accounts
-    const accountIds = transactionForm.split_to_entries.map(
-      (entry) => entry.account_id
-    );
+    const accountIds = transactionForm.account_splits
+      .map((entry) => entry.account_id)
+      .filter(Boolean);
     const uniqueAccountIds = new Set(accountIds);
     if (accountIds.length !== uniqueAccountIds.size) {
       toast.error("Cannot use the same account multiple times");
       return false;
     }
 
+    // Validate investment accounts have positive quantity and price if amount > 0
+    for (const entry of transactionForm.account_splits) {
+      if (
+        entry.account_id &&
+        (entry.debit_amount > 0 || entry.credit_amount > 0)
+      ) {
+        const account = accounts.find((acc) => acc.id === entry.account_id);
+        if (account && isInvestmentAccount(account)) {
+          if (entry.quantity <= 0 || entry.price <= 0) {
+            toast.error(
+              `Investment account ${account.name} must have positive quantity and price`
+            );
+            return false;
+          }
+        }
+      }
+    }
+
     return true;
   };
 
   // Update account price in account_prices table
-  const updateAccountPrice = async (accountId: string, price: number) => {
+  const updateAccountPrice = async (
+    accountId: string,
+    price: number,
+    date: string
+  ) => {
     try {
       const { data: existingPrice, error: fetchError } = await supabase
         .from("account_prices")
         .select("*")
         .eq("account_id", accountId)
         .eq("user_id", userId)
-        .eq("date", transactionForm.transaction_date)
+        .eq("date", date)
         .single();
 
       if (fetchError && fetchError.code !== "PGRST116") {
-        // PGRST116 is "no rows returned" which is expected when no price exists
         throw fetchError;
       }
 
@@ -416,11 +389,11 @@ export function AddTransactionModal({
           .from("account_prices")
           .update({
             price,
-            user_id: userId, // Ensure user_id is set even on updates
+            user_id: userId,
           })
           .eq("account_id", accountId)
           .eq("user_id", userId)
-          .eq("date", transactionForm.transaction_date);
+          .eq("date", date);
 
         if (updateError) throw updateError;
       } else {
@@ -431,25 +404,14 @@ export function AddTransactionModal({
             user_id: userId,
             account_id: accountId,
             price,
-            date: transactionForm.transaction_date,
+            date: date,
           });
 
         if (insertError) throw insertError;
       }
     } catch (error) {
       console.error("Error updating account price:", error);
-      // Don't throw here to avoid blocking the main transaction
       toast.error("Warning: Could not update account price");
-    }
-  };
-
-  // Calculate amount for investment transactions
-  const calculateAmount = (newQuantity?: string, newPrice?: string) => {
-    if (transactionForm.transaction_type === "investment") {
-      const quantity = parseFloat(newQuantity ?? transactionForm.quantity) || 0;
-      const price = parseFloat(newPrice ?? transactionForm.price) || 0;
-      const amount = quantity * price;
-      setTransactionForm((prev) => ({ ...prev, amount: amount.toString() }));
     }
   };
 
@@ -499,31 +461,30 @@ export function AddTransactionModal({
       description: "",
       reference_number: "",
       transaction_date: new Date().toISOString().split("T")[0],
-      transaction_type: "regular",
-      investment_type: "buy",
-      quantity: "1",
-      price: "",
-      amount: "",
       notes: "",
-      debit_account_id: "",
-      credit_account_id: "",
       selected_tags: [],
-      is_split: false,
-      split_to_entries: [
+      account_splits: [
         {
           account_id: "",
-          amount: 0,
-          description: "",
+          debit_amount: 0,
+          credit_amount: 0,
+          quantity: 1,
+          price: 0,
+          memo: "",
+        },
+        {
+          account_id: "",
+          debit_amount: 0,
+          credit_amount: 0,
+          quantity: 1,
+          price: 0,
+          memo: "",
         },
       ],
     });
     setTagSearchTerm("");
-    setFromAccountSearch("");
-    setToAccountSearch("");
-    setShowFromDropdown(false);
-    setShowToDropdown(false);
-    setSplitAccountSearchTerms({ 0: "" }); // Initialize first entry
-    setShowSplitDropdowns({ 0: false });
+    setAccountSearchTerms({ 0: "", 1: "" });
+    setShowAccountDropdowns({ 0: false, 1: false });
   };
 
   const handleTransactionSubmit = async (e: React.FormEvent) => {
@@ -531,403 +492,34 @@ export function AddTransactionModal({
 
     setIsSubmitting(true);
     try {
-      const amount = parseFloat(transactionForm.amount);
-      if (amount <= 0) {
-        toast.error("Amount must be greater than 0");
+      // Validate account splits
+      if (!validateAccountSplits()) {
         return;
       }
 
-      // Validate split transaction if enabled
-      if (transactionForm.is_split && !validateSplitTransaction()) {
-        return;
-      }
-
-      // For investments, validate quantity and price
-      if (transactionForm.transaction_type === "investment") {
-        const quantity = parseFloat(transactionForm.quantity);
-        const price = parseFloat(transactionForm.price);
-        if (quantity <= 0 || price <= 0) {
-          toast.error(
-            "Quantity and price must be greater than 0 for investments"
-          );
-          return;
-        }
-      }
-
-      const quantity =
-        transactionForm.transaction_type === "investment"
-          ? parseFloat(transactionForm.quantity)
-          : 1;
-      const price =
-        transactionForm.transaction_type === "investment"
-          ? parseFloat(transactionForm.price)
-          : amount;
+      const totalAmount = calculateTotalDebits(); // or calculateTotalCredits() - they should be equal
 
       // Create transaction entries for double-entry
-      let entries;
+      const entries = transactionForm.account_splits
+        .filter(
+          (split) =>
+            split.account_id &&
+            (split.debit_amount > 0 || split.credit_amount > 0)
+        )
+        .map((split, index) => {
+          const isDebit = split.debit_amount > 0;
+          const amount = isDebit ? split.debit_amount : split.credit_amount;
 
-      // Get account information
-      const fromAccount = accounts.find(
-        (acc) => acc.id === transactionForm.debit_account_id
-      );
-      const toAccount = accounts.find(
-        (acc) => acc.id === transactionForm.credit_account_id
-      );
-      const fromType = fromAccount?.account_types?.category;
-      const toType = toAccount?.account_types?.category;
-      const fromName = fromAccount?.name?.toLowerCase() || "";
-
-      // Detect transaction types based on GnuCash accounting rules
-      const isOpeningBalance =
-        fromType === "EQUITY" &&
-        fromName.includes("opening balance") &&
-        (toType === "ASSET" || toType === "LIABILITY");
-
-      if (transactionForm.is_split) {
-        // Split transaction: Determine the correct DEBIT/CREDIT based on account types
-        // For split transactions, we need to analyze what type of transaction this is
-        const fromAccountType = fromAccount?.account_types?.category;
-
-        if (fromAccountType === "ASSET" || fromAccountType === "LIABILITY") {
-          // Asset/Liability account as source - typically expense splits
-          // CREDIT the source account, DEBIT the split accounts
-          entries = [
-            {
-              account_id: transactionForm.debit_account_id, // Source account (Asset/Liability)
-              quantity: 1,
-              price: amount,
-              entry_side: "CREDIT" as const,
-              amount: amount,
-              line_number: 1,
-              description: transactionForm.description,
-            },
-            // Split accounts get DEBIT (typically expenses)
-            ...transactionForm.split_to_entries.map((splitEntry, index) => ({
-              account_id: splitEntry.account_id,
-              quantity: 1,
-              price: splitEntry.amount,
-              entry_side: "DEBIT" as const,
-              amount: splitEntry.amount,
-              line_number: index + 2,
-              description:
-                splitEntry.description || transactionForm.description,
-            })),
-          ];
-        } else if (fromAccountType === "INCOME") {
-          // Income account as source - income split to multiple assets
-          // CREDIT the income account, DEBIT the split accounts (assets)
-          entries = [
-            {
-              account_id: transactionForm.debit_account_id, // Source account (Income)
-              quantity: 1,
-              price: amount,
-              entry_side: "CREDIT" as const,
-              amount: amount,
-              line_number: 1,
-              description: transactionForm.description,
-            },
-            // Split accounts get DEBIT (typically assets)
-            ...transactionForm.split_to_entries.map((splitEntry, index) => ({
-              account_id: splitEntry.account_id,
-              quantity: 1,
-              price: splitEntry.amount,
-              entry_side: "DEBIT" as const,
-              amount: splitEntry.amount,
-              line_number: index + 2,
-              description:
-                splitEntry.description || transactionForm.description,
-            })),
-          ];
-        } else {
-          // Default split logic
-          entries = [
-            {
-              account_id: transactionForm.debit_account_id,
-              quantity: 1,
-              price: amount,
-              entry_side: "DEBIT" as const,
-              amount: amount,
-              line_number: 1,
-              description: transactionForm.description,
-            },
-            ...transactionForm.split_to_entries.map((splitEntry, index) => ({
-              account_id: splitEntry.account_id,
-              quantity: 1,
-              price: splitEntry.amount,
-              entry_side: "CREDIT" as const,
-              amount: splitEntry.amount,
-              line_number: index + 2,
-              description:
-                splitEntry.description || transactionForm.description,
-            })),
-          ];
-        }
-      } else if (isOpeningBalance) {
-        // Opening Balance: Handle based on account type
-        if (toType === "ASSET") {
-          // DEBIT asset, CREDIT equity (standard for asset opening balance)
-          entries = [
-            {
-              account_id: transactionForm.credit_account_id, // To Account (Asset)
-              quantity: 1,
-              price: amount,
-              entry_side: "DEBIT" as const,
-              amount: amount,
-              line_number: 1,
-              description: transactionForm.description,
-            },
-            {
-              account_id: transactionForm.debit_account_id, // From Account (Equity)
-              quantity: 1,
-              price: amount,
-              entry_side: "CREDIT" as const,
-              amount: amount,
-              line_number: 2,
-              description: transactionForm.description,
-            },
-          ];
-        } else if (toType === "LIABILITY") {
-          // CREDIT liability, DEBIT equity (for liability opening balance)
-          entries = [
-            {
-              account_id: transactionForm.credit_account_id, // To Account (Liability)
-              quantity: 1,
-              price: amount,
-              entry_side: "CREDIT" as const,
-              amount: amount,
-              line_number: 1,
-              description: transactionForm.description,
-            },
-            {
-              account_id: transactionForm.debit_account_id, // From Account (Equity)
-              quantity: 1,
-              price: amount,
-              entry_side: "DEBIT" as const,
-              amount: amount,
-              line_number: 2,
-              description: transactionForm.description,
-            },
-          ];
-        } else {
-          // Fallback for other account types
-          entries = [
-            {
-              account_id: transactionForm.credit_account_id,
-              quantity: 1,
-              price: amount,
-              entry_side: "DEBIT" as const,
-              amount: amount,
-              line_number: 1,
-              description: transactionForm.description,
-            },
-            {
-              account_id: transactionForm.debit_account_id,
-              quantity: 1,
-              price: amount,
-              entry_side: "CREDIT" as const,
-              amount: amount,
-              line_number: 2,
-              description: transactionForm.description,
-            },
-          ];
-        }
-      } else {
-        // Regular transactions: Apply GnuCash accounting rules based on account types
-
-        // Determine the correct DEBIT/CREDIT based on the nature of the transaction
-        if (fromType === "INCOME") {
-          // Income Transaction: DEBIT asset/liability (to), CREDIT income (from)
-          // Example: Salary -> Bank: DEBIT Bank, CREDIT Salary
-          entries = [
-            {
-              account_id: transactionForm.credit_account_id, // To Account (Asset/Liability)
-              quantity: 1,
-              price: amount,
-              entry_side: "DEBIT" as const,
-              amount: amount,
-              line_number: 1,
-              description: transactionForm.description,
-            },
-            {
-              account_id: transactionForm.debit_account_id, // From Account (Income)
-              quantity: 1,
-              price: amount,
-              entry_side: "CREDIT" as const,
-              amount: amount,
-              line_number: 2,
-              description: transactionForm.description,
-            },
-          ];
-        } else if (toType === "EXPENSE") {
-          // Expense Transaction: DEBIT expense (to), CREDIT asset/liability (from)
-          // Example: Bank -> Food: DEBIT Food, CREDIT Bank
-          entries = [
-            {
-              account_id: transactionForm.credit_account_id, // To Account (Expense)
-              quantity: 1,
-              price: amount,
-              entry_side: "DEBIT" as const,
-              amount: amount,
-              line_number: 1,
-              description: transactionForm.description,
-            },
-            {
-              account_id: transactionForm.debit_account_id, // From Account (Asset/Liability)
-              quantity: 1,
-              price: amount,
-              entry_side: "CREDIT" as const,
-              amount: amount,
-              line_number: 2,
-              description: transactionForm.description,
-            },
-          ];
-        } else if (
-          transactionForm.transaction_type === "investment" &&
-          transactionForm.investment_type === "buy"
-        ) {
-          // Investment Buy: DEBIT investment (to), CREDIT asset (from)
-          // Example: Bank -> Mutual Fund: DEBIT Mutual Fund, CREDIT Bank
-          entries = [
-            {
-              account_id: transactionForm.credit_account_id, // To Account (Investment)
-              quantity: quantity,
-              price: price,
-              entry_side: "DEBIT" as const,
-              amount: amount,
-              line_number: 1,
-              description: transactionForm.description,
-            },
-            {
-              account_id: transactionForm.debit_account_id, // From Account (Asset)
-              quantity: 1,
-              price: amount,
-              entry_side: "CREDIT" as const,
-              amount: amount,
-              line_number: 2,
-              description: transactionForm.description,
-            },
-          ];
-        } else if (
-          transactionForm.transaction_type === "investment" &&
-          transactionForm.investment_type === "sell"
-        ) {
-          // Investment Sell: DEBIT asset (to), CREDIT investment (from)
-          // Example: Mutual Fund -> Bank: DEBIT Bank, CREDIT Mutual Fund
-          entries = [
-            {
-              account_id: transactionForm.credit_account_id, // To Account (Asset)
-              quantity: 1,
-              price: amount,
-              entry_side: "DEBIT" as const,
-              amount: amount,
-              line_number: 1,
-              description: transactionForm.description,
-            },
-            {
-              account_id: transactionForm.debit_account_id, // From Account (Investment)
-              quantity: quantity,
-              price: price,
-              entry_side: "CREDIT" as const,
-              amount: amount,
-              line_number: 2,
-              description: transactionForm.description,
-            },
-          ];
-        } else if (
-          (fromType === "ASSET" || fromType === "LIABILITY") &&
-          (toType === "ASSET" || toType === "LIABILITY")
-        ) {
-          // Transfer between Assets/Liabilities: DEBIT destination, CREDIT source
-          // Example: Bank -> Cash: DEBIT Cash, CREDIT Bank
-          entries = [
-            {
-              account_id: transactionForm.credit_account_id, // To Account (destination)
-              quantity: 1,
-              price: amount,
-              entry_side: "DEBIT" as const,
-              amount: amount,
-              line_number: 1,
-              description: transactionForm.description,
-            },
-            {
-              account_id: transactionForm.debit_account_id, // From Account (source)
-              quantity: 1,
-              price: amount,
-              entry_side: "CREDIT" as const,
-              amount: amount,
-              line_number: 2,
-              description: transactionForm.description,
-            },
-          ];
-        } else if (fromType === "LIABILITY" && toType === "EXPENSE") {
-          // Liability to Expense (e.g., Credit Card -> Food): DEBIT expense, CREDIT liability
-          entries = [
-            {
-              account_id: transactionForm.credit_account_id, // To Account (Expense)
-              quantity: 1,
-              price: amount,
-              entry_side: "DEBIT" as const,
-              amount: amount,
-              line_number: 1,
-              description: transactionForm.description,
-            },
-            {
-              account_id: transactionForm.debit_account_id, // From Account (Liability)
-              quantity: 1,
-              price: amount,
-              entry_side: "CREDIT" as const,
-              amount: amount,
-              line_number: 2,
-              description: transactionForm.description,
-            },
-          ];
-        } else if (fromType === "ASSET" && toType === "LIABILITY") {
-          // Asset to Liability (e.g., Bank -> Loan Payment): DEBIT liability, CREDIT asset
-          // This is for loan payments where money from bank reduces the loan
-          entries = [
-            {
-              account_id: transactionForm.credit_account_id, // To Account (Liability - being reduced)
-              quantity: 1,
-              price: amount,
-              entry_side: "DEBIT" as const,
-              amount: amount,
-              line_number: 1,
-              description: transactionForm.description,
-            },
-            {
-              account_id: transactionForm.debit_account_id, // From Account (Asset)
-              quantity: 1,
-              price: amount,
-              entry_side: "CREDIT" as const,
-              amount: amount,
-              line_number: 2,
-              description: transactionForm.description,
-            },
-          ];
-        } else {
-          // Fallback: Use the user's selection as-is (should rarely happen)
-          entries = [
-            {
-              account_id: transactionForm.debit_account_id,
-              quantity: 1,
-              price: amount,
-              entry_side: "DEBIT" as const,
-              amount: amount,
-              line_number: 1,
-              description: transactionForm.description,
-            },
-            {
-              account_id: transactionForm.credit_account_id,
-              quantity: 1,
-              price: amount,
-              entry_side: "CREDIT" as const,
-              amount: amount,
-              line_number: 2,
-              description: transactionForm.description,
-            },
-          ];
-        }
-      }
+          return {
+            account_id: split.account_id,
+            quantity: split.quantity || 1,
+            price: split.price || amount,
+            entry_side: isDebit ? ("DEBIT" as const) : ("CREDIT" as const),
+            amount: amount,
+            line_number: index + 1,
+            description: split.memo || transactionForm.description,
+          };
+        });
 
       // Validate double-entry
       if (!AccountingEngine.validateTransaction(entries)) {
@@ -943,9 +535,9 @@ export function AddTransactionModal({
           reference_number: transactionForm.reference_number || null,
           description: transactionForm.description,
           transaction_date: transactionForm.transaction_date,
-          total_amount: amount,
+          total_amount: totalAmount,
           notes: transactionForm.notes || null,
-          is_split: transactionForm.is_split,
+          is_split: true, // All transactions are now splits
         })
         .select()
         .single();
@@ -981,36 +573,35 @@ export function AddTransactionModal({
       // Update account balances
       await AccountingEngine.updateAccountBalances(entriesWithTransactionId);
 
-      // Update account price for investment transactions
-      if (transactionForm.transaction_type === "investment") {
-        const priceValue = parseFloat(transactionForm.price);
-        if (transactionForm.investment_type === "buy") {
-          // For buy transactions, update price for the "to" account (investment account)
-          if (transactionForm.is_split) {
-            // For split investment transactions, find the investment account in splits
-            const investmentSplit = transactionForm.split_to_entries.find(
-              (entry) => {
-                const account = accounts.find(
-                  (acc) => acc.id === entry.account_id
-                );
-                return account && isInvestmentAccount(account);
-              }
-            );
-            if (investmentSplit) {
-              await updateAccountPrice(investmentSplit.account_id, priceValue);
-            }
-          } else {
-            await updateAccountPrice(
-              transactionForm.credit_account_id,
-              priceValue
+      // Process FIFO for investment sales
+      for (const entry of entriesWithTransactionId) {
+        if (entry.entry_side === "CREDIT") {
+          const account = accounts.find((acc) => acc.id === entry.account_id);
+          if (account && isInvestmentAccount(account)) {
+            await AccountingEngine.processInvestmentSaleWithFIFO(
+              entry,
+              transactionForm.transaction_date,
+              userId
             );
           }
-        } else {
-          // For sell transactions, update price for the "from" account (investment account)
-          await updateAccountPrice(
-            transactionForm.debit_account_id,
-            priceValue
-          );
+        }
+      }
+
+      // Update account prices for investment accounts
+      for (const split of transactionForm.account_splits) {
+        if (
+          split.account_id &&
+          split.price > 0 &&
+          (split.debit_amount > 0 || split.credit_amount > 0)
+        ) {
+          const account = accounts.find((acc) => acc.id === split.account_id);
+          if (account && isInvestmentAccount(account)) {
+            await updateAccountPrice(
+              split.account_id,
+              split.price,
+              transactionForm.transaction_date
+            );
+          }
         }
       }
 
@@ -1020,10 +611,7 @@ export function AddTransactionModal({
       onAccountsRefresh();
       setIsOpen(false);
 
-      const transactionTypeText = transactionForm.is_split
-        ? "Split transaction"
-        : "Transaction";
-      toast.success(`${transactionTypeText} added successfully!`);
+      toast.success("Transaction added successfully!");
     } catch (error) {
       console.error("Error creating transaction:", error);
       toast.error("Error creating transaction. Please try again.");
@@ -1040,7 +628,7 @@ export function AddTransactionModal({
           <span>Add Transaction</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
         <DialogHeader className="pb-3">
           <DialogTitle className="text-lg font-semibold flex items-center gap-2">
             <Receipt className="h-4 w-4 text-blue-600" />
@@ -1048,119 +636,11 @@ export function AddTransactionModal({
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleTransactionSubmit} className="space-y-4">
-          {/* Transaction Type */}
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant={
-                transactionForm.transaction_type === "regular"
-                  ? "default"
-                  : "outline"
-              }
-              size="sm"
-              onClick={() => {
-                setTransactionForm({
-                  ...transactionForm,
-                  transaction_type: "regular",
-                  debit_account_id: "",
-                  credit_account_id: "",
-                });
-                setFromAccountSearch("");
-                setToAccountSearch("");
-                setShowFromDropdown(false);
-                setShowToDropdown(false);
-              }}
-              className="flex-1 h-8"
-            >
-              <ArrowRightLeft className="w-3 h-3 mr-1" />
-              Regular
-            </Button>
-            <Button
-              type="button"
-              variant={
-                transactionForm.transaction_type === "investment"
-                  ? "default"
-                  : "outline"
-              }
-              size="sm"
-              onClick={() => {
-                setTransactionForm({
-                  ...transactionForm,
-                  transaction_type: "investment",
-                  debit_account_id: "",
-                  credit_account_id: "",
-                });
-                setFromAccountSearch("");
-                setToAccountSearch("");
-                setShowFromDropdown(false);
-                setShowToDropdown(false);
-              }}
-              className="flex-1 h-8"
-            >
-              <TrendingUp className="w-3 h-3 mr-1" />
-              Investment
-            </Button>
-          </div>
-
-          {/* Investment Type (Buy/Sell) - Only show when Investment is selected */}
-          {transactionForm.transaction_type === "investment" && (
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant={
-                  transactionForm.investment_type === "buy"
-                    ? "default"
-                    : "outline"
-                }
-                size="sm"
-                onClick={() => {
-                  setTransactionForm({
-                    ...transactionForm,
-                    investment_type: "buy",
-                    debit_account_id: "",
-                    credit_account_id: "",
-                  });
-                  setFromAccountSearch("");
-                  setToAccountSearch("");
-                  setShowFromDropdown(false);
-                  setShowToDropdown(false);
-                }}
-                className="flex-1 h-8"
-              >
-                Buy
-              </Button>
-              <Button
-                type="button"
-                variant={
-                  transactionForm.investment_type === "sell"
-                    ? "default"
-                    : "outline"
-                }
-                size="sm"
-                onClick={() => {
-                  setTransactionForm({
-                    ...transactionForm,
-                    investment_type: "sell",
-                    debit_account_id: "",
-                    credit_account_id: "",
-                  });
-                  setFromAccountSearch("");
-                  setToAccountSearch("");
-                  setShowFromDropdown(false);
-                  setShowToDropdown(false);
-                }}
-                className="flex-1 h-8"
-              >
-                Sell
-              </Button>
-            </div>
-          )}
-
+        <form onSubmit={handleTransactionSubmit} className="space-y-6">
           {/* Basic Fields */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label htmlFor="description" className="text-sm">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="description" className="text-sm font-medium">
                 Description *
               </Label>
               <Input
@@ -1177,8 +657,8 @@ export function AddTransactionModal({
                 required
               />
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="transaction_date" className="text-sm">
+            <div className="space-y-2">
+              <Label htmlFor="transaction_date" className="text-sm font-medium">
                 Date *
               </Label>
               <Input
@@ -1197,526 +677,344 @@ export function AddTransactionModal({
             </div>
           </div>
 
-          {/* Investment Fields */}
-          {transactionForm.transaction_type === "investment" ? (
-            <div className="grid grid-cols-3 gap-3">
-              <div className="space-y-1">
-                <Label htmlFor="quantity" className="text-sm">
-                  Quantity *
-                </Label>
-                <Input
-                  id="quantity"
-                  type="number"
-                  step="0.00000001"
-                  min="0.00000001"
-                  value={transactionForm.quantity}
-                  onChange={(e) => {
-                    const newQuantity = e.target.value;
-                    setTransactionForm({
-                      ...transactionForm,
-                      quantity: newQuantity,
-                    });
-                    calculateAmount(newQuantity, transactionForm.price);
-                  }}
-                  placeholder="1.00000000"
-                  className="h-9"
-                  required
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="price" className="text-sm">
-                  Price (₹) *
-                </Label>
-                <Input
-                  id="price"
-                  type="number"
-                  step="0.00000001"
-                  min="0.00000001"
-                  value={transactionForm.price}
-                  onChange={(e) => {
-                    const newPrice = e.target.value;
-                    setTransactionForm({
-                      ...transactionForm,
-                      price: newPrice,
-                    });
-                    calculateAmount(transactionForm.quantity, newPrice);
-                  }}
-                  placeholder="0.00000000"
-                  className="h-9"
-                  required
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="amount" className="text-sm">
-                  Amount (₹)
-                </Label>
-                <Input
-                  id="amount"
-                  type="number"
-                  step="0.000001"
-                  value={transactionForm.amount}
-                  onChange={(e) =>
-                    setTransactionForm({
-                      ...transactionForm,
-                      amount: e.target.value,
-                    })
-                  }
-                  placeholder="0.000000"
-                  className="h-9 bg-gray-50"
-                  readOnly
-                />
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-1">
-              <Label htmlFor="amount" className="text-sm">
-                Amount (₹) *
-              </Label>
-              <Input
-                id="amount"
-                type="number"
-                step="0.000001"
-                min="0.000001"
-                value={transactionForm.amount}
-                onChange={(e) =>
-                  setTransactionForm({
-                    ...transactionForm,
-                    amount: e.target.value,
-                  })
-                }
-                placeholder="0.000000"
-                className="h-9"
-                required
-              />
-            </div>
-          )}
-
-          {/* Split Transaction Toggle */}
-          <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
-            <input
-              type="checkbox"
-              id="split-toggle"
-              checked={transactionForm.is_split}
-              onChange={toggleSplitTransaction}
-              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+          <div className="space-y-2">
+            <Label htmlFor="reference_number" className="text-sm font-medium">
+              Reference Number
+            </Label>
+            <Input
+              id="reference_number"
+              value={transactionForm.reference_number}
+              onChange={(e) =>
+                setTransactionForm({
+                  ...transactionForm,
+                  reference_number: e.target.value,
+                })
+              }
+              placeholder="Reference number"
+              className="h-9"
             />
-            <label
-              htmlFor="split-toggle"
-              className="flex items-center gap-2 text-sm font-medium cursor-pointer"
-            >
-              <Split className="w-4 h-4" />
-              Split Transaction
-            </label>
-            {transactionForm.is_split && (
-              <span className="text-xs text-gray-600 ml-auto">
-                Split to multiple accounts
-              </span>
-            )}
           </div>
 
-          {/* Account Selection */}
+          {/* Account Splits */}
           <div className="space-y-4">
-            {/* From Account */}
-            <div className="space-y-1 relative">
-              <Label className="text-sm">From Account *</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
-                <Input
-                  value={fromAccountSearch}
-                  onChange={(e) => {
-                    setFromAccountSearch(e.target.value);
-                    setShowFromDropdown(e.target.value.length > 0);
-                  }}
-                  onFocus={() =>
-                    setShowFromDropdown(fromAccountSearch.length > 0)
-                  }
-                  placeholder="Search accounts..."
-                  className="pl-9 h-9"
-                />
-              </div>
-              {transactionForm.debit_account_id && (
-                <div className="text-xs text-gray-600 mt-1">
-                  {getAccountPath(transactionForm.debit_account_id)}
-                </div>
-              )}
-              {showFromDropdown && (
-                <div className="absolute top-full left-0 right-0 z-10 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
-                  {searchAccounts(fromAccountSearch, undefined, true).map(
-                    (account) => (
-                      <button
-                        key={account.id}
-                        type="button"
-                        onClick={() => {
-                          setTransactionForm({
-                            ...transactionForm,
-                            debit_account_id: account.id,
-                            credit_account_id: "",
-                          });
-                          setFromAccountSearch(account.name);
-                          setShowFromDropdown(false);
-                          setToAccountSearch("");
-                        }}
-                        className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b last:border-b-0"
-                      >
-                        <div className="font-medium text-sm">
-                          {account.name}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {getAccountPath(account.id)}
-                        </div>
-                      </button>
-                    )
-                  )}
-                  {searchAccounts(fromAccountSearch, undefined, true).length ===
-                    0 && (
-                    <div className="text-center text-gray-500 py-3 text-sm">
-                      No accounts found
-                    </div>
-                  )}
-                </div>
-              )}
+            <div className="flex items-center justify-between">
+              <Label className="text-lg font-semibold">Account Splits</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addAccountSplit}
+                className="h-8 text-green-600 border-green-600 hover:bg-green-50"
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Add Split
+              </Button>
             </div>
 
-            {/* To Account(s) */}
-            {!transactionForm.is_split ? (
-              /* Regular To Account */
-              <div className="space-y-1 relative">
-                <Label className="text-sm">To Account *</Label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
-                  <Input
-                    value={toAccountSearch}
-                    onChange={(e) => {
-                      setToAccountSearch(e.target.value);
-                      setShowToDropdown(e.target.value.length > 0);
-                    }}
-                    onFocus={() =>
-                      setShowToDropdown(toAccountSearch.length > 0)
-                    }
-                    placeholder="Search accounts..."
-                    className="pl-9 h-9"
-                    disabled={!transactionForm.debit_account_id}
-                  />
-                </div>
-                {transactionForm.credit_account_id && (
-                  <div className="text-xs text-gray-600 mt-1">
-                    {getAccountPath(transactionForm.credit_account_id)}
-                  </div>
-                )}
-                {showToDropdown && transactionForm.debit_account_id && (
-                  <div className="absolute top-full left-0 right-0 z-10 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
-                    {searchAccounts(
-                      toAccountSearch,
-                      [transactionForm.debit_account_id],
-                      false
-                    ).map((account) => (
-                      <button
-                        key={account.id}
-                        type="button"
-                        onClick={() => {
-                          setTransactionForm({
-                            ...transactionForm,
-                            credit_account_id: account.id,
-                          });
-                          setToAccountSearch(account.name);
-                          setShowToDropdown(false);
-                        }}
-                        className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b last:border-b-0"
-                      >
-                        <div className="font-medium text-sm">
-                          {account.name}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {getAccountPath(account.id)}
-                        </div>
-                      </button>
-                    ))}
-                    {searchAccounts(
-                      toAccountSearch,
-                      [transactionForm.debit_account_id],
-                      false
-                    ).length === 0 && (
-                      <div className="text-center text-gray-500 py-3 text-sm">
-                        No accounts found
-                      </div>
-                    )}
-                  </div>
-                )}
+            <div className="border rounded-lg overflow-visible">
+              {/* Table Header */}
+              <div className="bg-gray-50 border-b grid grid-cols-12 gap-2 p-3 text-sm font-medium text-gray-700">
+                <div className="col-span-3">Account</div>
+                <div className="col-span-2">Quantity</div>
+                <div className="col-span-2">Price</div>
+                <div className="col-span-2">Debit</div>
+                <div className="col-span-2">Credit</div>
+                <div className="col-span-1">Action</div>
               </div>
-            ) : (
-              /* Split To Accounts */
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium">
-                    To Accounts (Split) *
-                  </Label>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={addSplitToEntry}
-                  >
-                    <Plus className="w-4 h-4 mr-1" />
-                    Add Account
-                  </Button>
-                </div>
 
-                <div className="space-y-4">
-                  {transactionForm.split_to_entries.map((entry, index) => (
+              {/* Account Split Rows */}
+              <div className="divide-y overflow-visible">
+                {transactionForm.account_splits.map((split, index) => {
+                  const account = accounts.find(
+                    (acc) => acc.id === split.account_id
+                  );
+                  const isInvestment = account && isInvestmentAccount(account);
+
+                  return (
                     <div
                       key={index}
-                      className="border border-gray-200 rounded-lg p-4 space-y-3 bg-white"
+                      className="grid grid-cols-12 gap-2 p-3 items-start overflow-visible"
                     >
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium text-gray-700">
-                          Split Entry {index + 1}
-                        </span>
-                        {transactionForm.split_to_entries.length > 1 && (
+                      {/* Account Selection */}
+                      <div className="col-span-3 space-y-1 relative overflow-visible">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                          <Input
+                            value={accountSearchTerms[index] || ""}
+                            onChange={(e) => {
+                              setAccountSearchTerms((prev) => ({
+                                ...prev,
+                                [index]: e.target.value,
+                              }));
+                              setShowAccountDropdowns((prev) => ({
+                                ...prev,
+                                [index]: e.target.value.length > 0,
+                              }));
+                            }}
+                            onFocus={() =>
+                              setShowAccountDropdowns((prev) => ({
+                                ...prev,
+                                [index]: true,
+                              }))
+                            }
+                            onBlur={() => {
+                              setTimeout(() => {
+                                setShowAccountDropdowns((prev) => ({
+                                  ...prev,
+                                  [index]: false,
+                                }));
+                              }, 200);
+                            }}
+                            placeholder="Select Account"
+                            className="pl-10 h-9 text-sm"
+                          />
+                        </div>
+                        {split.account_id && (
+                          <div className="text-xs text-gray-500">
+                            {getAccountPath(split.account_id)}
+                          </div>
+                        )}
+                        {showAccountDropdowns[index] && (
+                          <div className="absolute top-full left-0 right-0 z-[9999] bg-white border-2 border-gray-300 rounded-lg shadow-xl max-h-48 overflow-y-auto mt-1">
+                            {searchAccounts(
+                              accountSearchTerms[index] || "",
+                              transactionForm.account_splits
+                                .map((s) => s.account_id)
+                                .filter(Boolean)
+                            ).map((account) => (
+                              <button
+                                key={account.id}
+                                type="button"
+                                onClick={() =>
+                                  handleAccountSelect(account.id, index)
+                                }
+                                className="w-full text-left px-4 py-3 hover:bg-blue-50 hover:border-l-4 hover:border-l-blue-500 border-b border-gray-100 last:border-b-0 transition-all duration-150 focus:bg-blue-50 focus:outline-none"
+                              >
+                                <div className="font-semibold text-sm text-gray-900">
+                                  {account.name}
+                                </div>
+                                <div className="text-xs text-gray-600 mt-0.5">
+                                  {getAccountPath(account.id)}
+                                </div>
+                              </button>
+                            ))}
+                            {searchAccounts(
+                              accountSearchTerms[index] || "",
+                              transactionForm.account_splits
+                                .map((s) => s.account_id)
+                                .filter(Boolean)
+                            ).length === 0 && (
+                              <div className="text-center text-gray-500 py-4 text-sm font-medium">
+                                No accounts found
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Quantity (for investment accounts) */}
+                      <div className="col-span-2">
+                        <Input
+                          type="number"
+                          step="0.00000001"
+                          min="0"
+                          value={isInvestment ? split.quantity || "" : ""}
+                          onChange={(e) =>
+                            updateAccountSplit(
+                              index,
+                              "quantity",
+                              parseFloat(e.target.value) || 0
+                            )
+                          }
+                          placeholder={isInvestment ? "1.00000000" : "N/A"}
+                          className="h-9 text-sm"
+                          disabled={!isInvestment}
+                        />
+                      </div>
+
+                      {/* Price (for investment accounts) */}
+                      <div className="col-span-2">
+                        <Input
+                          type="number"
+                          step="0.00000001"
+                          min="0"
+                          value={isInvestment ? split.price || "" : ""}
+                          onChange={(e) =>
+                            updateAccountSplit(
+                              index,
+                              "price",
+                              parseFloat(e.target.value) || 0
+                            )
+                          }
+                          placeholder={isInvestment ? "0.00000000" : "N/A"}
+                          className="h-9 text-sm"
+                          disabled={!isInvestment}
+                        />
+                      </div>
+
+                      {/* Debit Amount */}
+                      <div className="col-span-2">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={split.debit_amount || ""}
+                          onChange={(e) => {
+                            const value = parseFloat(e.target.value) || 0;
+                            updateAccountSplit(index, "debit_amount", value);
+                            // Clear credit amount when debit is entered
+                            if (value > 0) {
+                              updateAccountSplit(index, "credit_amount", 0);
+                            }
+                          }}
+                          placeholder="0.00"
+                          className="h-9 text-sm"
+                        />
+                      </div>
+
+                      {/* Credit Amount */}
+                      <div className="col-span-2">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={split.credit_amount || ""}
+                          onChange={(e) => {
+                            const value = parseFloat(e.target.value) || 0;
+                            updateAccountSplit(index, "credit_amount", value);
+                            // Clear debit amount when credit is entered
+                            if (value > 0) {
+                              updateAccountSplit(index, "debit_amount", 0);
+                            }
+                          }}
+                          placeholder="0.00"
+                          className="h-9 text-sm"
+                        />
+                      </div>
+
+                      {/* Remove Button */}
+                      <div className="col-span-1 flex justify-center">
+                        {transactionForm.account_splits.length > 2 && (
                           <Button
                             type="button"
                             variant="outline"
                             size="sm"
-                            onClick={() => removeSplitToEntry(index)}
+                            onClick={() => removeAccountSplit(index)}
                             className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <X className="w-4 h-4" />
                           </Button>
                         )}
                       </div>
+                    </div>
+                  );
+                })}
+              </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Account Selection */}
-                        <div className="space-y-2 relative">
-                          <Label className="text-sm">Account *</Label>
-                          <div className="relative">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                            <Input
-                              value={splitAccountSearchTerms[index] || ""}
-                              onChange={(e) => {
-                                setSplitAccountSearchTerms((prev) => ({
-                                  ...prev,
-                                  [index]: e.target.value,
-                                }));
-                                setShowSplitDropdowns((prev) => ({
-                                  ...prev,
-                                  [index]: e.target.value.length > 0,
-                                }));
-                              }}
-                              onFocus={() =>
-                                setShowSplitDropdowns((prev) => ({
-                                  ...prev,
-                                  [index]: true,
-                                }))
-                              }
-                              onBlur={() => {
-                                // Delay hiding dropdown to allow selection
-                                setTimeout(() => {
-                                  setShowSplitDropdowns((prev) => ({
-                                    ...prev,
-                                    [index]: false,
-                                  }));
-                                }, 200);
-                              }}
-                              placeholder="Search accounts..."
-                              className="pl-10 h-10"
-                            />
-                          </div>
-                          {entry.account_id && (
-                            <div className="text-xs text-gray-500 mt-1">
-                              Selected:{" "}
-                              {
-                                accounts.find(
-                                  (acc) => acc.id === entry.account_id
-                                )?.name
-                              }
-                            </div>
-                          )}
-                          {showSplitDropdowns[index] && (
-                            <div className="absolute top-full left-0 right-0 z-50 bg-white border rounded-md shadow-lg max-h-40 overflow-y-auto mt-1">
-                              {searchAccounts(
-                                splitAccountSearchTerms[index] || "",
-                                [
-                                  transactionForm.debit_account_id,
-                                  ...transactionForm.split_to_entries.map(
-                                    (e) => e.account_id
-                                  ),
-                                ].filter(Boolean),
-                                false
-                              ).map((account) => (
-                                <button
-                                  key={account.id}
-                                  type="button"
-                                  onClick={() =>
-                                    handleSplitAccountSelect(account.id, index)
-                                  }
-                                  className="w-full text-left px-3 py-2 hover:bg-gray-100 border-b last:border-b-0"
-                                >
-                                  <div className="font-medium text-sm">
-                                    {account.name}
-                                  </div>
-                                  <div className="text-xs text-gray-500">
-                                    {getAccountPath(account.id)}
-                                  </div>
-                                </button>
-                              ))}
-                              {searchAccounts(
-                                splitAccountSearchTerms[index] || "",
-                                [
-                                  transactionForm.debit_account_id,
-                                  ...transactionForm.split_to_entries.map(
-                                    (e) => e.account_id
-                                  ),
-                                ].filter(Boolean),
-                                false
-                              ).length === 0 && (
-                                <div className="text-center text-gray-500 py-3 text-sm">
-                                  No accounts found
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Amount */}
-                        <div className="space-y-2">
-                          <Label className="text-sm">Amount (₹) *</Label>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={entry.amount || ""}
-                            onChange={(e) =>
-                              updateSplitToEntry(
-                                index,
-                                "amount",
-                                parseFloat(e.target.value) || 0
-                              )
-                            }
-                            placeholder="0.00"
-                            className="h-10"
-                          />
-                        </div>
+              {/* Totals */}
+              <div className="bg-blue-50 border-t p-4">
+                <div className="flex justify-between items-center">
+                  <div className="flex space-x-8">
+                    <div className="text-center">
+                      <div className="text-xs font-medium text-gray-600 uppercase tracking-wide">
+                        Total Debits
+                      </div>
+                      <div className="text-lg font-bold text-gray-900">
+                        ₹{calculateTotalDebits().toFixed(2)}
                       </div>
                     </div>
-                  ))}
-                </div>
-
-                {/* Split Summary */}
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                    <div className="flex justify-between">
-                      <span className="font-medium">Total Amount:</span>
-                      <span className="font-bold text-blue-900">
-                        ₹{transactionForm.amount || "0.00"}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="font-medium">Split Total:</span>
-                      <span className="font-bold text-blue-900">
-                        ₹{calculateSplitTotal().toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="font-medium">Difference:</span>
-                      <span
-                        className={`font-bold ${
-                          calculateRemainingAmount() === 0
-                            ? "text-green-600"
-                            : "text-red-600"
-                        }`}
-                      >
-                        ₹{calculateRemainingAmount().toFixed(2)}
-                      </span>
+                    <div className="text-center">
+                      <div className="text-xs font-medium text-gray-600 uppercase tracking-wide">
+                        Total Credits
+                      </div>
+                      <div className="text-lg font-bold text-gray-900">
+                        ₹{calculateTotalCredits().toFixed(2)}
+                      </div>
                     </div>
                   </div>
-                  {calculateRemainingAmount() !== 0 && (
-                    <div className="mt-2 text-xs text-red-600 bg-red-50 p-2 rounded border border-red-200">
-                      ⚠️ Split amounts must equal the total amount before
-                      submitting
+                  <div className="text-center">
+                    <div className="text-xs font-medium text-gray-600 uppercase tracking-wide">
+                      Difference
                     </div>
-                  )}
+                    <div
+                      className={`text-lg font-bold ${
+                        Math.abs(calculateDifference()) < 0.01
+                          ? "text-green-600"
+                          : "text-red-600"
+                      }`}
+                    >
+                      {calculateDifference() >= 0 ? "+" : ""}₹
+                      {calculateDifference().toFixed(2)}
+                    </div>
+                    {Math.abs(calculateDifference()) >= 0.01 && (
+                      <div className="text-xs text-red-600 mt-1">
+                        Must be balanced
+                      </div>
+                    )}
+                  </div>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Tags */}
+          <div className="space-y-2 relative">
+            <Label htmlFor="tags" className="text-sm font-medium">
+              Tags
+            </Label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                id="tags"
+                value={tagSearchTerm}
+                onChange={(e) => setTagSearchTerm(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    const filteredTags = getFilteredTags();
+                    if (filteredTags.length > 0) {
+                      handleTagSelect(filteredTags[0]);
+                    } else if (tagSearchTerm.trim()) {
+                      handleTagCreate();
+                    }
+                  }
+                }}
+                placeholder="Search tags..."
+                className="pl-10 h-9"
+              />
+            </div>
+            {tagSearchTerm && (
+              <div className="absolute z-10 bg-white border rounded-md shadow-lg max-h-32 overflow-y-auto mt-1 w-full">
+                {getFilteredTags().map((tag) => (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    onClick={() => handleTagSelect(tag)}
+                    className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b last:border-b-0 text-sm"
+                  >
+                    {tag.name}
+                  </button>
+                ))}
+                {getFilteredTags().length === 0 && tagSearchTerm.trim() && (
+                  <button
+                    type="button"
+                    onClick={handleTagCreate}
+                    className="w-full text-left px-3 py-2 hover:bg-gray-50 bg-blue-50 text-blue-600 text-sm"
+                  >
+                    Create &quot;{tagSearchTerm}&quot;
+                  </button>
+                )}
               </div>
             )}
           </div>
 
-          {/* Optional Fields */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label htmlFor="reference_number" className="text-sm">
-                Reference
-              </Label>
-              <Input
-                id="reference_number"
-                value={transactionForm.reference_number}
-                onChange={(e) =>
-                  setTransactionForm({
-                    ...transactionForm,
-                    reference_number: e.target.value,
-                  })
-                }
-                placeholder="Reference number"
-                className="h-9"
-              />
-            </div>
-            <div className="space-y-1 relative">
-              <Label htmlFor="tags" className="text-sm">
-                Tags
-              </Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
-                <Input
-                  id="tags"
-                  value={tagSearchTerm}
-                  onChange={(e) => setTagSearchTerm(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      const filteredTags = getFilteredTags();
-                      if (filteredTags.length > 0) {
-                        handleTagSelect(filteredTags[0]);
-                      } else if (tagSearchTerm.trim()) {
-                        handleTagCreate();
-                      }
-                    }
-                  }}
-                  placeholder="Search tags..."
-                  className="pl-9 h-9"
-                />
-              </div>
-              {tagSearchTerm && (
-                <div className="absolute z-10 bg-white border rounded-md shadow-lg max-h-32 overflow-y-auto mt-1 w-full">
-                  {getFilteredTags().map((tag) => (
-                    <button
-                      key={tag.id}
-                      type="button"
-                      onClick={() => handleTagSelect(tag)}
-                      className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b last:border-b-0 text-sm"
-                    >
-                      {tag.name}
-                    </button>
-                  ))}
-                  {getFilteredTags().length === 0 && tagSearchTerm.trim() && (
-                    <button
-                      type="button"
-                      onClick={handleTagCreate}
-                      className="w-full text-left px-3 py-2 hover:bg-gray-50 bg-blue-50 text-blue-600 text-sm"
-                    >
-                      Create &quot;{tagSearchTerm}&quot;
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-
           {/* Selected Tags */}
           {transactionForm.selected_tags.length > 0 && (
-            <div className="flex flex-wrap gap-1">
+            <div className="flex flex-wrap gap-2">
               {transactionForm.selected_tags.map((tag) => (
                 <span
                   key={tag.id}
-                  className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs"
+                  className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm"
                 >
                   {tag.name}
                   <button
@@ -1724,7 +1022,7 @@ export function AddTransactionModal({
                     onClick={() => handleTagRemove(tag.id)}
                     className="hover:bg-blue-200 rounded-full p-0.5"
                   >
-                    <X className="h-2 w-2" />
+                    <X className="h-3 w-3" />
                   </button>
                 </span>
               ))}
@@ -1732,8 +1030,8 @@ export function AddTransactionModal({
           )}
 
           {/* Notes */}
-          <div className="space-y-1">
-            <Label htmlFor="notes" className="text-sm">
+          <div className="space-y-2">
+            <Label htmlFor="notes" className="text-sm font-medium">
               Notes
             </Label>
             <Textarea
@@ -1746,12 +1044,12 @@ export function AddTransactionModal({
                 })
               }
               placeholder="Additional notes..."
-              className="min-h-[60px] resize-none text-sm"
+              className="min-h-[80px] resize-none text-sm"
             />
           </div>
 
           {/* Form Actions */}
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex justify-end gap-3 pt-4">
             <Button
               type="button"
               variant="outline"
@@ -1760,7 +1058,6 @@ export function AddTransactionModal({
                 resetForm();
               }}
               disabled={isSubmitting}
-              size="sm"
             >
               Cancel
             </Button>
@@ -1769,21 +1066,14 @@ export function AddTransactionModal({
               disabled={
                 isSubmitting ||
                 !transactionForm.description ||
-                !transactionForm.amount ||
-                !transactionForm.debit_account_id ||
-                (transactionForm.is_split
-                  ? transactionForm.split_to_entries.some(
-                      (entry) => !entry.account_id || entry.amount <= 0
-                    ) ||
-                    Math.abs(
-                      parseFloat(transactionForm.amount) - calculateSplitTotal()
-                    ) > 0.01
-                  : !transactionForm.credit_account_id) ||
-                (transactionForm.transaction_type === "investment" &&
-                  (!transactionForm.quantity || !transactionForm.price))
+                transactionForm.account_splits.some(
+                  (split) => !split.account_id
+                ) ||
+                Math.abs(calculateDifference()) >= 0.01 ||
+                calculateTotalDebits() === 0 ||
+                calculateTotalCredits() === 0
               }
-              size="sm"
-              className="min-w-[80px]"
+              className="min-w-[120px]"
             >
               {isSubmitting ? (
                 <div className="flex items-center gap-2">

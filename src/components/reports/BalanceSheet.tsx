@@ -37,6 +37,16 @@ interface BalanceSheetData {
     accounts: Account[];
     total: number;
   };
+  income: {
+    accounts: Account[];
+    total: number;
+  };
+  expenses: {
+    accounts: Account[];
+    total: number;
+  };
+  netIncome: number;
+  unrealizedGains: number;
   netWorth: number;
   isBalanced: boolean;
 }
@@ -249,6 +259,12 @@ export function BalanceSheet() {
       const equity = accountsWithBalance.filter(
         (a) => a.account_types?.category === "EQUITY" && a.balance !== 0
       );
+      const income = accountsWithBalance.filter(
+        (a) => a.account_types?.category === "INCOME" && a.balance !== 0
+      );
+      const expenses = accountsWithBalance.filter(
+        (a) => a.account_types?.category === "EXPENSE" && a.balance !== 0
+      );
 
       // Categorize assets (simple categorization based on account names)
       const currentAssets = assets.filter(
@@ -296,11 +312,34 @@ export function BalanceSheet() {
         (sum, a) => sum + Math.abs(a.balance),
         0
       );
+
+      // Calculate income and expenses totals
+      const totalIncome = income.reduce(
+        (sum, a) => sum + Math.abs(a.balance),
+        0
+      );
+      const totalExpenses = expenses.reduce(
+        (sum, a) => sum + Math.abs(a.balance),
+        0
+      );
+      const netIncome = totalIncome - totalExpenses;
+
+      // Calculate unrealized gains from investment accounts
+      const unrealizedGains = assets.reduce((sum, a) => {
+        if (isInvestmentAccount(a) && a.marketValue && a.balance) {
+          return sum + (a.marketValue - a.balance);
+        }
+        return sum;
+      }, 0);
+
       const netWorth = totalAssets - totalLiabilities;
 
-      // Check if balance sheet balances (Assets = Liabilities + Equity)
+      // Check if balance sheet balances using GNUcash approach: Assets = Liabilities + Total Equity
+      // Total Equity includes: base equity + unrealized gains + net income (retained earnings)
+      const totalEquityWithEarnings = totalEquity + unrealizedGains + netIncome;
       const isBalanced =
-        Math.abs(totalAssets - (totalLiabilities + totalEquity)) < 0.01;
+        Math.abs(totalAssets - (totalLiabilities + totalEquityWithEarnings)) <
+        0.01;
 
       setBalanceSheet({
         assets: {
@@ -317,6 +356,16 @@ export function BalanceSheet() {
           accounts: equity,
           total: totalEquity,
         },
+        income: {
+          accounts: income,
+          total: totalIncome,
+        },
+        expenses: {
+          accounts: expenses,
+          total: totalExpenses,
+        },
+        netIncome,
+        unrealizedGains,
         netWorth,
         isBalanced,
       });
@@ -474,29 +523,98 @@ export function BalanceSheet() {
               <h4 className="font-medium text-gray-800 mb-3">Equity</h4>
               {renderAccountList(balanceSheet.equity.accounts, "")}
 
+              {/* Add unrealized gains to equity section */}
+              {balanceSheet.unrealizedGains !== 0 && (
+                <div className="flex justify-between text-sm mb-2">
+                  <span className="text-gray-600">Unrealized Gains/Losses</span>
+                  <span
+                    className={`font-medium ${
+                      balanceSheet.unrealizedGains >= 0
+                        ? "text-green-600"
+                        : "text-red-600"
+                    }`}
+                  >
+                    {formatINR(Math.abs(balanceSheet.unrealizedGains))}
+                  </span>
+                </div>
+              )}
+
               <div className="flex justify-between font-medium pt-2 border-t border-gray-200">
-                <span>Total Equity</span>
+                <span>Total Equity (including unrealized gains)</span>
                 <span className="text-green-600">
-                  {formatINR(balanceSheet.equity.total)}
+                  {formatINR(
+                    balanceSheet.equity.total + balanceSheet.unrealizedGains
+                  )}
                 </span>
               </div>
             </div>
 
-            {/* Total Liabilities + Equity */}
+            {/* Total Liabilities + Equity + Unrealized Gains */}
             <div className="flex justify-between font-semibold text-lg pt-3 border-t-2 border-gray-400">
               <span>Total Liabilities + Equity</span>
               <span className="text-purple-600">
                 {formatINR(
-                  balanceSheet.liabilities.total + balanceSheet.equity.total
+                  balanceSheet.liabilities.total +
+                    balanceSheet.equity.total +
+                    balanceSheet.unrealizedGains
                 )}
               </span>
+            </div>
+
+            {/* Income Statement Section */}
+            <div className="mt-6 pt-4 border-t-2 border-gray-300">
+              <h4 className="font-medium text-gray-800 mb-3">
+                Income Statement Impact
+              </h4>
+
+              {/* Income */}
+              <div className="mb-3">
+                <h5 className="text-sm font-medium text-gray-700 mb-2">
+                  Income
+                </h5>
+                {renderAccountList(balanceSheet.income.accounts, "")}
+                <div className="flex justify-between font-medium pt-2 border-t border-gray-200">
+                  <span>Total Income</span>
+                  <span className="text-green-600">
+                    {formatINR(balanceSheet.income.total)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Expenses */}
+              <div className="mb-3">
+                <h5 className="text-sm font-medium text-gray-700 mb-2">
+                  Expenses
+                </h5>
+                {renderAccountList(balanceSheet.expenses.accounts, "")}
+                <div className="flex justify-between font-medium pt-2 border-t border-gray-200">
+                  <span>Total Expenses</span>
+                  <span className="text-red-600">
+                    {formatINR(balanceSheet.expenses.total)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Net Income */}
+              <div className="flex justify-between font-semibold text-lg pt-3 border-t-2 border-gray-400">
+                <span>Net Income (Income - Expenses)</span>
+                <span
+                  className={`${
+                    balanceSheet.netIncome >= 0
+                      ? "text-green-600"
+                      : "text-red-600"
+                  }`}
+                >
+                  {formatINR(balanceSheet.netIncome)}
+                </span>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Balance Check & Net Worth */}
+        {/* Balance Check & Financial Summary */}
         <div className="mt-8 pt-6 border-t-2 border-gray-300">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div
               className={`p-4 rounded-lg ${
                 balanceSheet.isBalanced
@@ -515,7 +633,23 @@ export function BalanceSheet() {
                 </span>
               </div>
               <div className="text-xs text-gray-600 mt-1">
-                Assets = Liabilities + Equity
+                Assets = Liabilities + Total Equity
+              </div>
+              <div className="text-xs text-gray-500 mt-2">
+                {formatINR(balanceSheet.assets.total)} ={" "}
+                {formatINR(balanceSheet.liabilities.total)} +{" "}
+                {formatINR(
+                  balanceSheet.equity.total +
+                    balanceSheet.unrealizedGains +
+                    balanceSheet.netIncome
+                )}
+              </div>
+              <div className="text-xs text-gray-400 mt-1">
+                (Total Equity includes: Base ₹
+                {formatINR(balanceSheet.equity.total).replace("₹", "")} +
+                Unrealized ₹
+                {formatINR(balanceSheet.unrealizedGains).replace("₹", "")} + Net
+                Income ₹{formatINR(balanceSheet.netIncome).replace("₹", "")})
               </div>
             </div>
 
@@ -528,6 +662,22 @@ export function BalanceSheet() {
               </div>
               <div className="text-xs text-gray-600 mt-1">
                 Assets - Liabilities
+              </div>
+            </div>
+
+            <div className="p-4 rounded-lg bg-green-50 border border-green-200">
+              <div className="flex items-center justify-between">
+                <span className="font-medium">Total Equity</span>
+                <span className="text-lg font-bold text-green-700">
+                  {formatINR(
+                    balanceSheet.equity.total +
+                      balanceSheet.unrealizedGains +
+                      balanceSheet.netIncome
+                  )}
+                </span>
+              </div>
+              <div className="text-xs text-gray-600 mt-1">
+                Equity + Unrealized Gains + Net Income
               </div>
             </div>
           </div>

@@ -5,6 +5,8 @@ export interface Account {
   account_type_id: string;
   name: string;
   code?: string;
+  isin?: string;
+  exchange?: string;
   description?: string;
   is_active: boolean;
   balance: number;

@@ -39,6 +39,8 @@ CREATE TABLE public.accounts (
   account_type_id UUID REFERENCES public.account_types(id),
   name VARCHAR NOT NULL,
   code VARCHAR,
+  isin VARCHAR,
+  exchange VARCHAR,
   description TEXT,
   is_placeholder BOOLEAN DEFAULT false,
   is_active BOOLEAN DEFAULT true,

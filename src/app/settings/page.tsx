@@ -67,6 +67,8 @@ interface Account {
   account_type_id: string | null;
   name: string;
   code?: string | null;
+  isin?: string | null;
+  exchange?: string | null;
   description?: string | null;
   is_placeholder?: boolean | null;
   is_active: boolean | null;
@@ -128,6 +130,8 @@ export default function Settings() {
     description: "",
     initial_balance: "0",
     is_placeholder: false,
+    isin: "",
+    exchange: "",
   });
 
   // Edit form state
@@ -138,6 +142,8 @@ export default function Settings() {
     parent_id: "none",
     description: "",
     is_placeholder: false,
+    isin: "",
+    exchange: "",
   });
 
   // Tag form state
@@ -282,61 +288,6 @@ export default function Settings() {
     setExpandedParentAccounts(newExpanded);
   };
 
-  // Render hierarchical account options
-  const renderAccountOptions = (
-    accountList: HierarchicalAccount[],
-    level: number = 0
-  ): React.ReactElement[] => {
-    const options: React.ReactElement[] = [];
-
-    accountList.forEach((account) => {
-      const isSystemAccount = account.user_id === null;
-      const icon = isSystemAccount ? "📁" : "💼";
-
-      // Create visual hierarchy with proper indentation
-      const indentLevel = level * 20; // 20px per level
-      const treeLines = level > 0 ? "├── " : "";
-
-      options.push(
-        <SelectItem key={account.id} value={account.id}>
-          <div
-            className="flex items-center w-full"
-            style={{ paddingLeft: `${indentLevel}px` }}
-          >
-            <span className="text-gray-400 font-mono text-xs mr-1">
-              {treeLines}
-            </span>
-            <span className="mr-2">{icon}</span>
-            <span
-              className={`font-medium ${
-                isSystemAccount ? "text-blue-700" : "text-gray-900"
-              }`}
-            >
-              {account.name}
-            </span>
-            {account.account_types && (
-              <span className="text-xs text-gray-500 ml-2">
-                ({account.account_types.name})
-              </span>
-            )}
-            {isSystemAccount && (
-              <span className="text-xs bg-blue-100 text-blue-700 px-1 py-0.5 rounded ml-2">
-                System
-              </span>
-            )}
-          </div>
-        </SelectItem>
-      );
-
-      // Add children recursively
-      if (account.children.length > 0) {
-        options.push(...renderAccountOptions(account.children, level + 1));
-      }
-    });
-
-    return options;
-  };
-
   useEffect(() => {
     if (!user && loading) {
       initialize();
@@ -366,6 +317,8 @@ export default function Settings() {
           user_id: user.id,
           name: accountForm.name,
           code: accountForm.code || null,
+          isin: accountForm.isin || null,
+          exchange: accountForm.exchange || null,
           account_type_id: accountForm.account_type_id,
           parent_id:
             !accountForm.parent_id || accountForm.parent_id === "none"
@@ -536,6 +489,8 @@ export default function Settings() {
         description: "",
         initial_balance: "0",
         is_placeholder: false,
+        isin: "",
+        exchange: "",
       });
       setIsAccountModalOpen(false);
       toast.success("Account created successfully!");
@@ -563,6 +518,8 @@ export default function Settings() {
       parent_id: account.parent_id || "none",
       description: account.description || "",
       is_placeholder: account.is_placeholder || false,
+      isin: account.isin || "",
+      exchange: account.exchange || "",
     });
 
     setIsEditModalOpen(true);
@@ -580,6 +537,8 @@ export default function Settings() {
         .update({
           name: editForm.name,
           code: editForm.code || null,
+          isin: editForm.isin || null,
+          exchange: editForm.exchange || null,
           account_type_id: hasTransactions
             ? editingAccount.account_type_id
             : editForm.account_type_id,
@@ -609,6 +568,8 @@ export default function Settings() {
         parent_id: "none",
         description: "",
         is_placeholder: false,
+        isin: "",
+        exchange: "",
       });
       setEditingAccount(null);
       setIsEditModalOpen(false);
@@ -807,107 +768,166 @@ export default function Settings() {
                     </DialogHeader>
 
                     <form onSubmit={handleAccountSubmit} className="space-y-4">
-                      {/* Basic Information */}
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <Label htmlFor="accountName" className="text-sm">
-                            Account Name *
-                          </Label>
-                          <Input
-                            id="accountName"
-                            value={accountForm.name}
-                            onChange={(e) =>
-                              setAccountForm({
-                                ...accountForm,
-                                name: e.target.value,
-                              })
-                            }
-                            placeholder="Account name"
-                            className="h-9"
-                            required
-                          />
+                      {/* Form Fields - Custom Grid Layout */}
+                      <div className="space-y-3">
+                        {/* Row 1: Account Type (left) | Account Name (right) */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label htmlFor="accountType" className="text-sm">
+                              Account Type *
+                            </Label>
+                            <Select
+                              value={accountForm.account_type_id}
+                              onValueChange={(value) =>
+                                setAccountForm({
+                                  ...accountForm,
+                                  account_type_id: value,
+                                })
+                              }
+                            >
+                              <SelectTrigger className="h-9">
+                                <SelectValue placeholder="Select type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {accountTypes.map((type) => (
+                                  <SelectItem key={type.id} value={type.id}>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
+                                        {type.category}
+                                      </span>
+                                      <span className="text-sm">
+                                        {type.name}
+                                      </span>
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="space-y-1">
+                            <Label htmlFor="accountName" className="text-sm">
+                              Account Name *
+                            </Label>
+                            <Input
+                              id="accountName"
+                              value={accountForm.name}
+                              onChange={(e) =>
+                                setAccountForm({
+                                  ...accountForm,
+                                  name: e.target.value,
+                                })
+                              }
+                              placeholder="Account name"
+                              className="h-9"
+                              required
+                            />
+                          </div>
                         </div>
 
-                        <div className="space-y-1">
-                          <Label htmlFor="accountCode" className="text-sm">
-                            Account Code
-                          </Label>
-                          <Input
-                            id="accountCode"
-                            value={accountForm.code}
-                            onChange={(e) =>
-                              setAccountForm({
-                                ...accountForm,
-                                code: e.target.value,
-                              })
-                            }
-                            placeholder="Optional code"
-                            className="h-9"
-                          />
-                        </div>
-                      </div>
+                        {/* Row 2: Account Code (left) | Initial Balance (right) */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label htmlFor="accountCode" className="text-sm">
+                              Account Code
+                            </Label>
+                            <Input
+                              id="accountCode"
+                              value={accountForm.code}
+                              onChange={(e) =>
+                                setAccountForm({
+                                  ...accountForm,
+                                  code: e.target.value,
+                                })
+                              }
+                              placeholder="Optional code"
+                              className="h-9"
+                            />
+                          </div>
 
-                      {/* Account Classification */}
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <Label htmlFor="accountType" className="text-sm">
-                            Account Type *
-                          </Label>
-                          <Select
-                            value={accountForm.account_type_id}
-                            onValueChange={(value) =>
-                              setAccountForm({
-                                ...accountForm,
-                                account_type_id: value,
-                              })
-                            }
-                          >
-                            <SelectTrigger className="h-9">
-                              <SelectValue placeholder="Select type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {accountTypes.map((type) => (
-                                <SelectItem key={type.id} value={type.id}>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
-                                      {type.category}
-                                    </span>
-                                    <span className="text-sm">{type.name}</span>
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <div className="space-y-1">
+                            <Label htmlFor="initialBalance" className="text-sm">
+                              Initial Balance (₹)
+                            </Label>
+                            <Input
+                              id="initialBalance"
+                              type="number"
+                              step="0.000001"
+                              value={
+                                accountForm.is_placeholder
+                                  ? "0"
+                                  : accountForm.initial_balance
+                              }
+                              onChange={(e) =>
+                                setAccountForm({
+                                  ...accountForm,
+                                  initial_balance: e.target.value,
+                                })
+                              }
+                              placeholder="0.000000"
+                              className={`h-9 ${
+                                accountForm.is_placeholder
+                                  ? "bg-gray-50 cursor-not-allowed"
+                                  : ""
+                              }`}
+                              disabled={accountForm.is_placeholder}
+                            />
+                          </div>
                         </div>
 
-                        <div className="space-y-1">
-                          <Label htmlFor="initialBalance" className="text-sm">
-                            Initial Balance (₹)
-                          </Label>
-                          <Input
-                            id="initialBalance"
-                            type="number"
-                            step="0.000001"
-                            value={
-                              accountForm.is_placeholder
-                                ? "0"
-                                : accountForm.initial_balance
-                            }
-                            onChange={(e) =>
-                              setAccountForm({
-                                ...accountForm,
-                                initial_balance: e.target.value,
-                              })
-                            }
-                            placeholder="0.000000"
-                            className={`h-9 ${
-                              accountForm.is_placeholder
-                                ? "bg-gray-50 cursor-not-allowed"
-                                : ""
-                            }`}
-                            disabled={accountForm.is_placeholder}
-                          />
-                        </div>
+                        {/* Row 3: ISIN (left) | Exchange (right) - Only for investment accounts */}
+                        {(() => {
+                          const selectedAccountType = accountTypes.find(
+                            (type) => type.id === accountForm.account_type_id
+                          );
+                          const showInvestmentFields =
+                            selectedAccountType?.name?.toLowerCase() ===
+                              "mutual fund" ||
+                            selectedAccountType?.name?.toLowerCase() ===
+                              "stock";
+
+                          if (!showInvestmentFields) return null;
+
+                          return (
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="space-y-1">
+                                <Label htmlFor="isin" className="text-sm">
+                                  ISIN
+                                </Label>
+                                <Input
+                                  id="isin"
+                                  value={accountForm.isin}
+                                  onChange={(e) =>
+                                    setAccountForm({
+                                      ...accountForm,
+                                      isin: e.target.value,
+                                    })
+                                  }
+                                  placeholder="e.g., INF090I01239"
+                                  className="h-9"
+                                />
+                              </div>
+
+                              <div className="space-y-1">
+                                <Label htmlFor="exchange" className="text-sm">
+                                  Exchange
+                                </Label>
+                                <Input
+                                  id="exchange"
+                                  value={accountForm.exchange}
+                                  onChange={(e) =>
+                                    setAccountForm({
+                                      ...accountForm,
+                                      exchange: e.target.value,
+                                    })
+                                  }
+                                  placeholder="e.g., NSE, BSE"
+                                  className="h-9"
+                                />
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
 
                       {/* Parent Account Hierarchy */}
@@ -1139,59 +1159,8 @@ export default function Settings() {
                           Basic Information
                         </h3>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label
-                              htmlFor="editAccountName"
-                              className="text-sm font-medium"
-                            >
-                              Account Name *
-                            </Label>
-                            <Input
-                              id="editAccountName"
-                              value={editForm.name}
-                              onChange={(e) =>
-                                setEditForm({
-                                  ...editForm,
-                                  name: e.target.value,
-                                })
-                              }
-                              placeholder="e.g., HDFC Savings Account"
-                              className="h-10"
-                              required
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label
-                              htmlFor="editAccountCode"
-                              className="text-sm font-medium"
-                            >
-                              Account Code
-                            </Label>
-                            <Input
-                              id="editAccountCode"
-                              value={editForm.code}
-                              onChange={(e) =>
-                                setEditForm({
-                                  ...editForm,
-                                  code: e.target.value,
-                                })
-                              }
-                              placeholder="e.g., HDFC-SAV-001"
-                              className="h-10"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Account Classification Section */}
-                      <div className="space-y-4">
-                        <h3 className="text-sm font-medium text-gray-900 border-b pb-2">
-                          Account Classification
-                        </h3>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Account Type | Account Name */}
+                        <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-2">
                             <Label
                               htmlFor="editAccountType"
@@ -1237,11 +1206,57 @@ export default function Settings() {
                               <div className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 rounded-md">
                                 <div className="w-2 h-2 bg-amber-500 rounded-full flex-shrink-0"></div>
                                 <p className="text-xs text-amber-700">
-                                  Account type is locked because this account
-                                  has transactions
+                                  Account type locked due to existing
+                                  transactions
                                 </p>
                               </div>
                             )}
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label
+                              htmlFor="editAccountName"
+                              className="text-sm font-medium"
+                            >
+                              Account Name *
+                            </Label>
+                            <Input
+                              id="editAccountName"
+                              value={editForm.name}
+                              onChange={(e) =>
+                                setEditForm({
+                                  ...editForm,
+                                  name: e.target.value,
+                                })
+                              }
+                              placeholder="e.g., HDFC Savings Account"
+                              className="h-10"
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        {/* Account Code | Parent Account */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label
+                              htmlFor="editAccountCode"
+                              className="text-sm font-medium"
+                            >
+                              Account Code
+                            </Label>
+                            <Input
+                              id="editAccountCode"
+                              value={editForm.code}
+                              onChange={(e) =>
+                                setEditForm({
+                                  ...editForm,
+                                  code: e.target.value,
+                                })
+                              }
+                              placeholder="e.g., HDFC-SAV-001"
+                              className="h-10"
+                            />
                           </div>
 
                           <div className="space-y-2">
@@ -1263,42 +1278,92 @@ export default function Settings() {
                               <SelectTrigger className="h-10">
                                 <SelectValue placeholder="Select parent account" />
                               </SelectTrigger>
-                              <SelectContent className="max-h-[300px]">
+                              <SelectContent>
                                 <SelectItem value="none">
-                                  <div className="flex items-center gap-2 py-1">
-                                    <span className="text-lg">🏠</span>
-                                    <span className="font-medium">
-                                      No Parent (Top Level)
-                                    </span>
-                                  </div>
+                                  No Parent (Top Level)
                                 </SelectItem>
-                                {(() => {
-                                  const hierarchicalAccounts =
-                                    buildAccountHierarchy(
-                                      accounts.filter(
-                                        (acc) => acc.id !== editingAccount?.id
-                                      )
-                                    );
-                                  return (
-                                    <>
-                                      {hierarchicalAccounts.length > 0 && (
-                                        <>
-                                          <div className="px-3 py-2 text-xs font-medium text-gray-500 bg-gray-50 border-t">
-                                            Available Parent Accounts
-                                          </div>
-                                          {renderAccountOptions(
-                                            hierarchicalAccounts
-                                          )}
-                                        </>
-                                      )}
-                                    </>
-                                  );
-                                })()}
+                                {accounts
+                                  .filter(
+                                    (acc) =>
+                                      acc.is_placeholder &&
+                                      acc.id !== editingAccount?.id
+                                  )
+                                  .map((acc) => (
+                                    <SelectItem key={acc.id} value={acc.id}>
+                                      {acc.name}
+                                    </SelectItem>
+                                  ))}
                               </SelectContent>
                             </Select>
                           </div>
                         </div>
                       </div>
+
+                      {/* Investment Details Section - Only for Mutual Fund and Stock accounts */}
+                      {(() => {
+                        const selectedAccountType = accountTypes.find(
+                          (type) => type.id === editForm.account_type_id
+                        );
+                        const showInvestmentFields =
+                          selectedAccountType?.name?.toLowerCase() ===
+                            "mutual fund" ||
+                          selectedAccountType?.name?.toLowerCase() === "stock";
+
+                        if (!showInvestmentFields) return null;
+
+                        return (
+                          <div className="space-y-4">
+                            <h3 className="text-sm font-medium text-gray-900 border-b pb-2">
+                              Investment Details
+                            </h3>
+
+                            {/* ISIN | Exchange */}
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label
+                                  htmlFor="editIsin"
+                                  className="text-sm font-medium"
+                                >
+                                  ISIN
+                                </Label>
+                                <Input
+                                  id="editIsin"
+                                  value={editForm.isin}
+                                  onChange={(e) =>
+                                    setEditForm({
+                                      ...editForm,
+                                      isin: e.target.value,
+                                    })
+                                  }
+                                  placeholder="e.g., INF090I01239"
+                                  className="h-10"
+                                />
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label
+                                  htmlFor="editExchange"
+                                  className="text-sm font-medium"
+                                >
+                                  Exchange
+                                </Label>
+                                <Input
+                                  id="editExchange"
+                                  value={editForm.exchange}
+                                  onChange={(e) =>
+                                    setEditForm({
+                                      ...editForm,
+                                      exchange: e.target.value,
+                                    })
+                                  }
+                                  placeholder="e.g., NSE, BSE"
+                                  className="h-10"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
 
                       {/* Additional Details Section */}
                       <div className="space-y-4">

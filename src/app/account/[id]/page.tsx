@@ -462,85 +462,89 @@ export default function AccountDetailPage() {
         {/* Account Summary */}
         {isInvestmentAccount(account) && investmentMetrics ? (
           /* Investment Account Summary */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-gray-600">
-                  Total Invested
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="text-2xl font-bold text-gray-900">
-                  {formatINR(investmentMetrics.totalInvested)}
-                </div>
-              </CardContent>
-            </Card>
+          <div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-gray-600">
+                    Total Invested
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="text-2xl font-bold text-gray-900">
+                    {formatINR(investmentMetrics.totalInvested)}
+                  </div>
+                </CardContent>
+              </Card>
 
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-gray-600">
-                  Total Units
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="text-2xl font-bold text-gray-900">
-                  {investmentMetrics.totalUnits.toFixed(3)}
-                </div>
-              </CardContent>
-            </Card>
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-gray-600">
+                    Total Units
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="text-2xl font-bold text-gray-900">
+                    {investmentMetrics.totalUnits.toFixed(3)}
+                  </div>
+                </CardContent>
+              </Card>
 
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-gray-600">
-                  Current Price
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="text-2xl font-bold text-gray-900">
-                  {currentPrice ? formatINR(currentPrice) : "N/A"}
-                </div>
-              </CardContent>
-            </Card>
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-gray-600">
+                    Current Price
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="text-2xl font-bold text-gray-900">
+                    {currentPrice ? formatINR(currentPrice) : "N/A"}
+                  </div>
+                </CardContent>
+              </Card>
 
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-gray-600">
-                  Market Value
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="text-2xl font-bold text-gray-900">
-                  {formatINR(investmentMetrics.currentValue)}
-                </div>
-                <div
-                  className={`text-sm ${
-                    investmentMetrics.gain >= 0
-                      ? "text-green-600"
-                      : "text-red-600"
-                  }`}
-                >
-                  {investmentMetrics.gain >= 0 ? "+" : ""}
-                  {formatINR(investmentMetrics.gain)} (
-                  {investmentMetrics.gainPercentage.toFixed(2)}%)
-                </div>
-              </CardContent>
-            </Card>
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-gray-600">
+                    Market Value
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="text-2xl font-bold text-gray-900">
+                    {formatINR(investmentMetrics.currentValue)}
+                  </div>
+                  <div
+                    className={`text-sm ${
+                      investmentMetrics.gain >= 0
+                        ? "text-green-600"
+                        : "text-red-600"
+                    }`}
+                  >
+                    {investmentMetrics.gain >= 0 ? "+" : ""}
+                    {formatINR(investmentMetrics.gain)} (
+                    {investmentMetrics.gainPercentage.toFixed(2)}%)
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         ) : (
           /* Regular Account Summary */
-          <Card>
-            <CardHeader>
-              <CardTitle>Account Balance</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-gray-900">
-                {formatINR(calculatedBalance)}
-              </div>
-              {account.description && (
-                <p className="text-gray-600 mt-2">{account.description}</p>
-              )}
-            </CardContent>
-          </Card>
+          <div>
+            <Card>
+              <CardHeader>
+                <CardTitle>Account Balance</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-gray-900">
+                  {formatINR(calculatedBalance)}
+                </div>
+                {account.description && (
+                  <p className="text-gray-600 mt-2">{account.description}</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         )}
 
         {/* Transactions */}

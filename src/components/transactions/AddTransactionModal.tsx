@@ -310,7 +310,7 @@ export function AddTransactionModal({
 
     // Check if amounts balance
     if (Math.abs(totalDebits - totalCredits) > 0.01) {
-      toast.error("Total debits must equal total credits");
+      toast.error("Total deposits must equal withdrawals");
       return false;
     }
 
@@ -329,7 +329,7 @@ export function AddTransactionModal({
     );
 
     if (!hasDebit || !hasCredit) {
-      toast.error("Must have at least one debit and one credit entry");
+      toast.error("Must have at least one deposit and one withdrawal entry");
       return false;
     }
 
@@ -717,8 +717,8 @@ export function AddTransactionModal({
                 <div className="col-span-3">Account</div>
                 <div className="col-span-2">Quantity</div>
                 <div className="col-span-2">Price</div>
-                <div className="col-span-2">Debit</div>
-                <div className="col-span-2">Credit</div>
+                <div className="col-span-2">Deposit</div>
+                <div className="col-span-2">Withdraw</div>
                 <div className="col-span-1">Action</div>
               </div>
 
@@ -815,17 +815,21 @@ export function AddTransactionModal({
                       {/* Quantity (for investment accounts) */}
                       <div className="col-span-2">
                         <Input
-                          type="number"
-                          step="0.00000001"
-                          min="0"
                           value={isInvestment ? split.quantity || "" : ""}
-                          onChange={(e) =>
-                            updateAccountSplit(
-                              index,
-                              "quantity",
-                              parseFloat(e.target.value) || 0
-                            )
-                          }
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            // Allow empty string or valid numbers
+                            if (
+                              value === "" ||
+                              (!isNaN(Number(value)) && Number(value) >= 0)
+                            ) {
+                              updateAccountSplit(
+                                index,
+                                "quantity",
+                                value === "" ? 0 : parseFloat(value)
+                              );
+                            }
+                          }}
                           placeholder={isInvestment ? "1.00000000" : "N/A"}
                           className="h-9 text-sm"
                           disabled={!isInvestment}
@@ -835,17 +839,21 @@ export function AddTransactionModal({
                       {/* Price (for investment accounts) */}
                       <div className="col-span-2">
                         <Input
-                          type="number"
-                          step="0.00000001"
-                          min="0"
                           value={isInvestment ? split.price || "" : ""}
-                          onChange={(e) =>
-                            updateAccountSplit(
-                              index,
-                              "price",
-                              parseFloat(e.target.value) || 0
-                            )
-                          }
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            // Allow empty string or valid numbers
+                            if (
+                              value === "" ||
+                              (!isNaN(Number(value)) && Number(value) >= 0)
+                            ) {
+                              updateAccountSplit(
+                                index,
+                                "price",
+                                value === "" ? 0 : parseFloat(value)
+                              );
+                            }
+                          }}
                           placeholder={isInvestment ? "0.00000000" : "N/A"}
                           className="h-9 text-sm"
                           disabled={!isInvestment}
@@ -855,16 +863,25 @@ export function AddTransactionModal({
                       {/* Debit Amount */}
                       <div className="col-span-2">
                         <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
                           value={split.debit_amount || ""}
                           onChange={(e) => {
-                            const value = parseFloat(e.target.value) || 0;
-                            updateAccountSplit(index, "debit_amount", value);
-                            // Clear credit amount when debit is entered
-                            if (value > 0) {
-                              updateAccountSplit(index, "credit_amount", 0);
+                            const value = e.target.value;
+                            // Allow empty string or valid numbers
+                            if (
+                              value === "" ||
+                              (!isNaN(Number(value)) && Number(value) >= 0)
+                            ) {
+                              const numValue =
+                                value === "" ? 0 : parseFloat(value);
+                              updateAccountSplit(
+                                index,
+                                "debit_amount",
+                                numValue
+                              );
+                              // Clear credit amount when debit is entered
+                              if (numValue > 0) {
+                                updateAccountSplit(index, "credit_amount", 0);
+                              }
                             }
                           }}
                           placeholder="0.00"
@@ -875,16 +892,25 @@ export function AddTransactionModal({
                       {/* Credit Amount */}
                       <div className="col-span-2">
                         <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
                           value={split.credit_amount || ""}
                           onChange={(e) => {
-                            const value = parseFloat(e.target.value) || 0;
-                            updateAccountSplit(index, "credit_amount", value);
-                            // Clear debit amount when credit is entered
-                            if (value > 0) {
-                              updateAccountSplit(index, "debit_amount", 0);
+                            const value = e.target.value;
+                            // Allow empty string or valid numbers
+                            if (
+                              value === "" ||
+                              (!isNaN(Number(value)) && Number(value) >= 0)
+                            ) {
+                              const numValue =
+                                value === "" ? 0 : parseFloat(value);
+                              updateAccountSplit(
+                                index,
+                                "credit_amount",
+                                numValue
+                              );
+                              // Clear debit amount when credit is entered
+                              if (numValue > 0) {
+                                updateAccountSplit(index, "debit_amount", 0);
+                              }
                             }
                           }}
                           placeholder="0.00"
@@ -917,7 +943,7 @@ export function AddTransactionModal({
                   <div className="flex space-x-8">
                     <div className="text-center">
                       <div className="text-xs font-medium text-gray-600 uppercase tracking-wide">
-                        Total Debits
+                        Total Deposits
                       </div>
                       <div className="text-lg font-bold text-gray-900">
                         ₹{calculateTotalDebits().toFixed(2)}
@@ -925,7 +951,7 @@ export function AddTransactionModal({
                     </div>
                     <div className="text-center">
                       <div className="text-xs font-medium text-gray-600 uppercase tracking-wide">
-                        Total Credits
+                        Total Withdrawals
                       </div>
                       <div className="text-lg font-bold text-gray-900">
                         ₹{calculateTotalCredits().toFixed(2)}

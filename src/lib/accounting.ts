@@ -528,14 +528,6 @@ export class AccountingEngine {
           ]);
         }
       }
-
-      console.log(`FIFO calculation for ${account.name}:`, {
-        saleQuantity,
-        saleAmount,
-        costBasis,
-        gainLoss,
-        fifoLots: fifoResult.fifoLots,
-      });
     } catch (error) {
       console.error("Error processing FIFO for investment sale:", error);
       // Don't throw error to avoid breaking the transaction

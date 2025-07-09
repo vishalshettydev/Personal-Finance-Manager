@@ -61,8 +61,11 @@ export type Database = {
           code: string | null;
           created_at: string | null;
           description: string | null;
+          exchange: string | null;
           id: string;
           is_active: boolean | null;
+          is_placeholder: boolean | null;
+          isin: string | null;
           name: string;
           parent_id: string | null;
           updated_at: string | null;
@@ -74,8 +77,11 @@ export type Database = {
           code?: string | null;
           created_at?: string | null;
           description?: string | null;
+          exchange?: string | null;
           id?: string;
           is_active?: boolean | null;
+          is_placeholder?: boolean | null;
+          isin?: string | null;
           name: string;
           parent_id?: string | null;
           updated_at?: string | null;
@@ -87,8 +93,11 @@ export type Database = {
           code?: string | null;
           created_at?: string | null;
           description?: string | null;
+          exchange?: string | null;
           id?: string;
           is_active?: boolean | null;
+          is_placeholder?: boolean | null;
+          isin?: string | null;
           name?: string;
           parent_id?: string | null;
           updated_at?: string | null;
